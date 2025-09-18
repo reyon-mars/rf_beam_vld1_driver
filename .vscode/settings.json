@@ -1,0 +1,15 @@
+{
+    "files.associations": {
+        "bitset": "cpp",
+        "unordered_map": "cpp",
+        "map": "cpp",
+        "set": "cpp",
+        "array": "cpp",
+        "string": "cpp",
+        "string_view": "cpp",
+        "vector": "cpp",
+        "ios": "cpp",
+        "cstddef": "cpp",
+        "cstdint": "cpp"
+    }
+}

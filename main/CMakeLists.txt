@@ -1,0 +1,16 @@
+idf_component_register(
+    SRCS 
+        "main.cpp"
+        "app_layer/vld1_application.cpp"
+    INCLUDE_DIRS 
+        "." 
+        "app_layer"
+    REQUIRES
+        driver
+        freertos
+        averager
+        led
+        rs485_slave
+        uart
+        vld1
+)

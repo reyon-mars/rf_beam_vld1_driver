@@ -1,0 +1,24 @@
+# -------------------------------------------------
+# CMake / ESP-IDF build output
+# -------------------------------------------------
+build/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+install_manifest.txt
+
+# -------------------------------------------------
+# ESP-IDF generated binaries
+# -------------------------------------------------
+*.bin
+*.elf
+*.map
+*.hex
+*.log
+
+# -------------------------------------------------
+# ESP-IDF configuration backups
+# -------------------------------------------------
+sdkconfig.old
+sdkconfig.ci
+
