@@ -4,10 +4,10 @@ static constexpr char TAG[] = "Application";
 
 void Application::start()
 {
-    xTaskCreate(uart_read_task, "uart_read_task", 4096, &ctx_, 10, nullptr);
+    xTaskCreate(vld1_read_task, "vld1_read_task", 4096, &ctx_, 10, nullptr);
 }
 
-void Application::uart_read_task(void *arg)
+void Application::vld1_read_task(void *arg)
 {
     AppContext *ctx = static_cast<AppContext *>(arg);
 
@@ -33,7 +33,7 @@ void Application::uart_read_task(void *arg)
                     if (std::strcmp(header, "RESP") == 0 && payload_len >= 1)
                     {
                         uint8_t error_code = payload[0];
-                        uint16_t regs[3] = {0xFFFF, 0xFFFF, 0xFFFF}; // default error
+                        uint16_t regs[3] = {0xFFFF, 0xFFFF, 0xFFFF};
 
                         switch (error_code)
                         {
@@ -74,11 +74,9 @@ void Application::uart_read_task(void *arg)
                             break;
                         }
                     }
-                    // ---------------- PDAT Handling ----------------
-                    // ---------------- PDAT Handling ----------------
                     else if (std::strcmp(header, "PDAT") == 0)
                     {
-                        uint16_t regs[3] = {0xFFFF, 0xFFFF, 0xFFFF}; // default error values
+                        uint16_t regs[3] = {0xFFFF, 0xFFFF, 0xFFFF};
 
                         if (payload_len >= sizeof(vld1::pdat_resp_t))
                         {
@@ -104,21 +102,40 @@ void Application::uart_read_task(void *arg)
                         }
                         else
                         {
-                            // No target detected → payload missing
                             ESP_LOGW(TAG, "PDAT: No target detected, sending error values to Modbus");
                         }
-
-                        // Write to RS485 Modbus slave in all cases (payload or no payload)
                         ctx->rs485_slave->write(regs, 3);
                     }
 
-                    // ---------------- VERS Handling ----------------
                     else if (std::strcmp(header, "VERS") == 0)
                     {
                         char fw[65] = {0};
                         int copy_len = (payload_len < 64) ? static_cast<int>(payload_len) : 64;
                         std::memcpy(fw, payload, copy_len);
                         ESP_LOGI(TAG, "VLD1 Firmware: %s", fw);
+                    }
+                    else if (std::strcmp(header, "RPST") == 0)
+                    {
+                        if (payload_len != sizeof(vld1::radar_params_t))
+                        {
+                            ESP_LOGW(TAG, "Payload length mismatch: %" PRIu32 " expected %zu", payload_len, sizeof(vld1::radar_params_t));
+                            break;
+                        }
+
+                        ctx->radar_params = *reinterpret_cast<vld1::radar_params_t *>(payload);
+
+                        ESP_LOGI(TAG, "Firmware Version: %s", ctx->radar_params.firmware_version);
+                        ESP_LOGI(TAG, "Unique ID: %s", ctx->radar_params.unique_id);
+                        ESP_LOGI(TAG, "Distance Range: %" PRIu8, static_cast<uint8_t>(ctx->radar_params.distance_range));
+                        ESP_LOGI(TAG, "Threshold Offset [dB]: %" PRIu8, ctx->radar_params.threshold_offset);
+                        ESP_LOGI(TAG, "Min Range Filter: %" PRIu16, ctx->radar_params.min_range_filter);
+                        ESP_LOGI(TAG, "Max Range Filter: %" PRIu16, ctx->radar_params.max_range_filter);
+                        ESP_LOGI(TAG, "Distance Avg Count: %" PRIu8, ctx->radar_params.distance_avg_count);
+                        ESP_LOGI(TAG, "Target Filter: %" PRIu8, static_cast<uint8_t>(ctx->radar_params.target_filter));
+                        ESP_LOGI(TAG, "Distance Precision: %" PRIu8, static_cast<uint8_t>(ctx->radar_params.distance_precision));
+                        ESP_LOGI(TAG, "TX Power: %" PRIu8, ctx->radar_params.tx_power);
+                        ESP_LOGI(TAG, "Chirp Integration Count: %" PRIu8, ctx->radar_params.chirp_integration_count);
+                        ESP_LOGI(TAG, "Short Range Distance Filter: %" PRIu8, static_cast<uint8_t>(ctx->radar_params.short_range_distance_filter));
                     }
 
                     std::memmove(buffer, buffer + parsed_len, buf_len - parsed_len);

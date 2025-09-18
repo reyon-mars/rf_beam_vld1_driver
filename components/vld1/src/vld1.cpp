@@ -45,3 +45,101 @@ int vld1::parse_message(uint8_t *buffer, int len, char *response_code, uint8_t *
 
     return static_cast<int>(total_len);
 }
+
+void vld1::set_distance_range(vld1_distance_range_t range) noexcept
+{
+    vld1_header_t header{};
+    std::memcpy(header.header, "RRAI", 4);
+
+    const uint8_t payload = static_cast<uint8_t>(range);
+    header.payload_len = sizeof(payload);
+
+    send_packet(header, &payload);
+}
+
+void vld1::set_threshold_offset(uint8_t val) noexcept
+{
+    vld1_header_t header{};
+    std::memcpy(header.header, "THOF", 4);
+
+    header.payload_len = sizeof(val);
+    send_packet(header, &val);
+}
+
+void vld1::set_min_range_filter(uint16_t val) noexcept
+{
+    vld1_header_t header{};
+    std::memcpy(header.header, "MIRA", 4);
+
+    header.payload_len = sizeof(val);
+    send_packet(header, reinterpret_cast<const uint8_t *>(&val));
+}
+
+void vld1::set_max_range_filter(uint16_t val) noexcept
+{
+    vld1_header_t header{};
+    std::memcpy(header.header, "MARA", 4);
+
+    header.payload_len = sizeof(val);
+    send_packet(header, reinterpret_cast<const uint8_t *>(&val));
+}
+
+void vld1::set_target_filter(target_filter_t filter) noexcept
+{
+    vld1_header_t header{};
+    std::memcpy(header.header, "TGFI", 4);
+
+    const uint8_t payload = static_cast<uint8_t>(filter);
+    header.payload_len = sizeof(payload);
+
+    send_packet(header, &payload);
+}
+
+void vld1::set_precision_mode(precision_mode_t mode) noexcept
+{
+    vld1_header_t header{};
+    std::memcpy(header.header, "PREC", 4);
+
+    const uint8_t payload = static_cast<uint8_t>(mode);
+    header.payload_len = sizeof(payload);
+
+    send_packet(header, &payload);
+}
+
+void vld1::exit_sequence() noexcept
+{
+    vld1_header_t header{};
+    std::memcpy(header.header, "GBYE", 4);
+
+    header.payload_len = 0;
+    send_packet(header, nullptr);
+}
+
+void vld1::set_chirp_integration_count(uint8_t val) noexcept
+{
+    vld1_header_t header{};
+    std::memcpy(header.header, "INTN", 4);
+
+    header.payload_len = sizeof(val);
+    send_packet(header, &val);
+}
+
+void vld1::set_tx_power(uint8_t power) noexcept
+{
+    vld1_header_t header{};
+    std::memcpy(header.header, "TXPW", 4);
+
+    header.payload_len = sizeof(power);
+    send_packet(header, &power);
+}
+
+void vld1::set_short_range_distance_filter(short_range_distance_t state) noexcept
+{
+    vld1_header_t header{};
+    std::memcpy(header.header, "SRDF", 4);
+
+    const uint8_t payload = static_cast<uint8_t>(state);
+    header.payload_len = sizeof(payload);
+
+    send_packet(header, &payload);
+}

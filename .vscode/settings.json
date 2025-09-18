@@ -10,6 +10,7 @@
         "vector": "cpp",
         "ios": "cpp",
         "cstddef": "cpp",
-        "cstdint": "cpp"
+        "cstdint": "cpp",
+        "istream": "cpp"
     }
 }
