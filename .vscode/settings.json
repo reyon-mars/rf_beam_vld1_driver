@@ -12,5 +12,6 @@
         "cstddef": "cpp",
         "cstdint": "cpp",
         "istream": "cpp"
-    }
+    },
+    "idf.pythonInstallPath": "/Users/reyon/.espressif/python_env/idf5.4_py3.12_env/bin/python"
 }

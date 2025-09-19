@@ -13,4 +13,8 @@ idf_component_register(
         rs485_slave
         uart
         vld1
+        web_server
+        esp_http_server 
+        esp_wifi 
+        nvs_flash
 )
