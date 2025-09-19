@@ -4,13 +4,9 @@
 #include "averager.hpp"
 #include "led.hpp"
 #include "vld1_application.hpp"
-#include "web_server.hpp"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_log.h"
-#include "nvs_flash.h"
-#include "esp_netif.h"
-#include "esp_event.h"
 #include <cstring>
 
 static constexpr char TAG[] = "Main";
@@ -18,13 +14,6 @@ static constexpr char TAG[] = "Main";
 extern "C" void app_main()
 {
     ESP_LOGI(TAG, "Starting VLD1 app");
-
-    ESP_ERROR_CHECK(nvs_flash_init());
-    ESP_ERROR_CHECK(esp_netif_init());
-    ESP_ERROR_CHECK(esp_event_loop_create_default());
-
-    VLD1ConfigServer server;
-    ESP_ERROR_CHECK(server.start());
 
     static uart vld1_uart(UART_NUM_1, 12, 13, 115200, 512);
     vld1_uart.init(UART_DATA_8_BITS, UART_PARITY_EVEN, UART_STOP_BITS_1);
