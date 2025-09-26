@@ -1,45 +1,37 @@
 #pragma once
-#include "esp_err.h"
-#include <esp_err.h>
-#include <esp_http_server.h>
-#include "vld1.hpp"
 #include <string>
+#include "esp_err.h"
+#include "esp_http_server.h"
+#include "vld1.hpp"
 
-class web_server
-{
+class web_server {
 public:
-    explicit web_server(vld1 &sensor);
+    explicit web_server(vld1 &sensor) noexcept;
     ~web_server();
 
-    esp_err_t init(); // Initialize SoftAP + HTTP server
-    void deinit();    // Stop server + SoftAP
-
-    std::string getSSID() const { return ssid_; }
-    std::string getIP() const { return ip_; }
+    esp_err_t init();
+    void deinit();
 
 private:
-    // ---------------- Server & sensor ----------------
+    // Wi-Fi
+    esp_err_t initSoftAP();
+    void updateIPAddress();
+
+    // JSON config
+    esp_err_t applyConfigFromJson(const char *json_data, size_t len) noexcept;
+    std::string getConfigAsJson();
+
+    // HTTP handlers
+    static void* getServerFromRequest(httpd_req_t *req);
+    static esp_err_t handleGetConfig(httpd_req_t *req);
+    static esp_err_t handlePostConfig(httpd_req_t *req);
+    void registerHandlers();
+
+private:
     httpd_handle_t server_;
     vld1 &sensor_;
-
-    // ---------------- SoftAP state ----------------
     std::string ssid_;
     std::string password_;
     std::string ip_;
     bool is_initialized_;
-
-    // ---------------- Handlers ----------------
-    static esp_err_t handleGetConfig(httpd_req_t *req);
-    static esp_err_t handlePostConfig(httpd_req_t *req);
-
-    void registerHandlers();
-
-    // ---------------- Utilities ----------------
-    void applyConfigFromJson(const char *json_data, size_t len);
-    std::string getConfigAsJson();
-    static void *getServerFromRequest(httpd_req_t *req);
-
-    // ---------------- WiFi Helpers ----------------
-    esp_err_t initSoftAP();
-    void updateIPAddress();
 };
