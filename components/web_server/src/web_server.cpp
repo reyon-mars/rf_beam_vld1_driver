@@ -8,7 +8,7 @@
 #include <cstring>
 #include <algorithm>
 
-static const char *TAG = "WebServer";
+static constexpr char TAG[] = "WebServer";
 
 // ---------------- Constructor / Destructor ----------------
 web_server::web_server(vld1 &sensor)
