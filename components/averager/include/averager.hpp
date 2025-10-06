@@ -16,10 +16,10 @@ public:
     // Returns true once at least batch_size samples have been accepted
     bool is_complete() const noexcept;
 
-    // Robust average of the current batch, in meters
+    // average of the current batch, in meters
     double average_meters() const noexcept;
 
-    // Robust average in millimeters (clamped to [0, 65535])
+    // average in millimeters (clamped to [0, 65535])
     uint16_t average_millimeters() const noexcept;
 
     // Reset state for a new batch
@@ -28,7 +28,7 @@ public:
 private:
     size_t batch_size_; // number of samples in one batch
     size_t count_;      // how many samples have been seen (accepted)
-    double curr_avg_m_; // cached robust average in meters
+    double curr_avg_m_; // cached average in meters
 
     double max_step_;             // maximum plausible change between consecutive samples
     double trim_fraction_;        // fraction of samples trimmed from each end
