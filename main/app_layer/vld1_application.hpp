@@ -27,8 +27,10 @@ public:
         : ctx_{&vld1_sensor, &rs, &rs_slave, &v, &avg, &led_main, radar_params} {}
 
     void start();
+    void start_gnfd_task();
 
 private:
+    static void gnfd_task(void *arg);
     static void vld1_read_task(void *arg);
     AppContext ctx_;
 };

@@ -145,3 +145,27 @@ void Application::vld1_read_task(void *arg)
         }
     }
 }
+
+void Application::gnfd_task(void* arg)
+{
+    auto* app = static_cast<Application*>(arg);  // get Application instance
+    vld1& sensor = *app->ctx_.vld1_sensor;      // reference to sensor
+
+    while (true)
+    {
+        const uint8_t payload_gnfd = 0x04;
+        vld1::vld1_header_t header{};
+        std::memcpy(header.header, "GNFD", 4);
+        header.payload_len = 1;
+
+        sensor.send_packet(header, &payload_gnfd);
+        vTaskDelay(pdMS_TO_TICKS(1000));
+    }
+}
+
+
+
+void Application::start_gnfd_task()
+{
+    xTaskCreate(gnfd_task, "gnfd_task", 2048, this, 5, nullptr);
+}
