@@ -6,6 +6,7 @@
 #include "vld1_application.hpp"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "web_server.hpp"
 #include "esp_log.h"
 #include <cstring>
 
@@ -53,4 +54,7 @@ extern "C" void app_main()
 
     app.start_gnfd_task();
     
+    static web_server server( vld1_sensor, Application::gnfd_task_handle_ );
+    
+
 }

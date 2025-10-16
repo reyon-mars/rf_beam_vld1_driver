@@ -68,6 +68,8 @@ public:
 
     int parse_message(uint8_t *buffer, int len, char *out_header, uint8_t *out_payload, uint32_t *out_len) noexcept;
 
+
+    void set_radar_parameters( const radar_params_t &params_struct ) noexcept;
     void set_distance_range(vld1_distance_range_t range) noexcept;
     void set_threshold_offset(uint8_t val) noexcept;
     void set_min_range_filter(uint16_t val) noexcept;

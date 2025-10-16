@@ -7,10 +7,36 @@ void Application::start()
     xTaskCreate(vld1_read_task, "vld1_read_task", 4096, &ctx_, 10, nullptr);
 }
 
-void Application::vld1_read_task(void *arg)
+void Application::start_gnfd_task()
 {
-    AppContext *ctx = static_cast<AppContext *>(arg);
+    if (gnfd_task_handle_ == nullptr)
+    {
+        xTaskCreate(gnfd_task, "gnfd_task", 4096, this, 5, &gnfd_task_handle_);
+        ESP_LOGI(TAG, "GNFD task started.");
+    }
+}
 
+void Application::suspend_gnfd_task()
+{
+    if (gnfd_task_handle_)
+    {
+        vTaskSuspend(gnfd_task_handle_);
+        ESP_LOGW(TAG, "GNFD task suspended for radar parameter update.");
+    }
+}
+
+void Application::resume_gnfd_task()
+{
+    if (gnfd_task_handle_)
+    {
+        vTaskResume(gnfd_task_handle_);
+        ESP_LOGI(TAG, "GNFD task resumed after radar parameter update.");
+    }
+}
+
+void Application::vld1_read_task(void* arg)
+{
+    auto* ctx = static_cast<AppContext*>(arg);
     uint8_t buffer[512];
     int buf_len = 0;
 
@@ -21,6 +47,7 @@ void Application::vld1_read_task(void *arg)
         {
             buf_len += read_bytes;
             int parsed_len = 0;
+
             do
             {
                 char header[5] = {0};
@@ -30,6 +57,7 @@ void Application::vld1_read_task(void *arg)
                 parsed_len = ctx->vld1_sensor->parse_message(buffer, buf_len, header, payload, &payload_len);
                 if (parsed_len > 0)
                 {
+                    // === RESP Handler ===
                     if (std::strcmp(header, "RESP") == 0 && payload_len >= 1)
                     {
                         uint8_t error_code = payload[0];
@@ -37,110 +65,85 @@ void Application::vld1_read_task(void *arg)
 
                         switch (error_code)
                         {
-                        case 0:
-                            ESP_LOGI(TAG, "VLD1 RESP: OK");
-                            break;
-                        case 1:
-                            ESP_LOGW(TAG, "VLD1 RESP: Unknown command");
-                            ctx->rs485_slave->write(regs, 3);
-                            break;
-                        case 2:
-                            ESP_LOGW(TAG, "VLD1 RESP: Invalid parameter value");
-                            ctx->rs485_slave->write(regs, 3);
-                            break;
-                        case 3:
-                            ESP_LOGW(TAG, "VLD1 RESP: Invalid RPST version");
-                            ctx->rs485_slave->write(regs, 3);
-                            break;
-                        case 4:
-                            ESP_LOGW(TAG, "VLD1 RESP: UART error (parity, framing, noise)");
-                            ctx->rs485_slave->write(regs, 3);
-                            break;
-                        case 5:
-                            ESP_LOGW(TAG, "VLD1 RESP: No calibration values");
-                            ctx->rs485_slave->write(regs, 3);
-                            break;
-                        case 6:
-                            ESP_LOGW(TAG, "VLD1 RESP: Timeout");
-                            ctx->rs485_slave->write(regs, 3);
-                            break;
-                        case 7:
-                            ESP_LOGW(TAG, "VLD1 RESP: Application corrupt or not programmed");
-                            ctx->rs485_slave->write(regs, 3);
-                            break;
-                        default:
-                            ESP_LOGW(TAG, "VLD1 RESP: Unknown error code %u", error_code);
-                            ctx->rs485_slave->write(regs, 3);
-                            break;
+                            case 0: ESP_LOGI(TAG, "VLD1 RESP: OK"); break;
+                            case 1: ESP_LOGW(TAG, "RESP: Unknown command"); ctx->rs485_slave->write(regs, 3); break;
+                            case 2: ESP_LOGW(TAG, "RESP: Invalid parameter value"); ctx->rs485_slave->write(regs, 3); break;
+                            case 3: ESP_LOGW(TAG, "RESP: Invalid RPST version"); ctx->rs485_slave->write(regs, 3); break;
+                            case 4: ESP_LOGW(TAG, "RESP: UART error"); ctx->rs485_slave->write(regs, 3); break;
+                            case 5: ESP_LOGW(TAG, "RESP: No calibration values"); ctx->rs485_slave->write(regs, 3); break;
+                            case 6: ESP_LOGW(TAG, "RESP: Timeout"); ctx->rs485_slave->write(regs, 3); break;
+                            case 7: ESP_LOGW(TAG, "RESP: Application corrupt"); ctx->rs485_slave->write(regs, 3); break;
+                            default: ESP_LOGW(TAG, "RESP: Unknown error code %u", error_code); ctx->rs485_slave->write(regs, 3); break;
                         }
                     }
+
+                    // === PDAT Handler ===
                     else if (std::strcmp(header, "PDAT") == 0)
                     {
                         uint16_t regs[3] = {0xFFFF, 0xFFFF, 0xFFFF};
 
                         if (payload_len >= sizeof(vld1::pdat_resp_t))
                         {
-                            auto *pdat_data = reinterpret_cast<vld1::pdat_resp_t *>(payload);
-                            float distance_m = pdat_data->distance;
+                            auto* pdat = reinterpret_cast<vld1::pdat_resp_t*>(payload);
+                            float distance_m = pdat->distance;
                             uint16_t distance_mm = static_cast<uint16_t>(distance_m * 1000.0f);
 
                             ctx->averager->add_sample(distance_m);
                             uint16_t avg_mm = ctx->averager->average_millimeters();
 
                             regs[0] = distance_mm;
-                            regs[1] = pdat_data->magnitude;
+                            regs[1] = pdat->magnitude;
                             regs[2] = avg_mm;
 
-                            ESP_LOGI(TAG, "\t[ Distance (mm): %u | Magnitude (dB): %u | Avg (mm): %u ]",
-                                     distance_mm, pdat_data->magnitude, avg_mm);
+                            ESP_LOGI(TAG, "Distance=%u mm | Mag=%u | Avg=%u", distance_mm, pdat->magnitude, avg_mm);
 
                             if (ctx->averager->is_complete())
                             {
-                                ESP_LOGI(TAG, "Batch complete: avg=%.3f m (%u mm)", ctx->averager->average_meters(), avg_mm);
+                                ESP_LOGI(TAG, "Batch complete: avg=%.3f m (%u mm)",
+                                         ctx->averager->average_meters(), avg_mm);
                                 ctx->averager->reset();
                             }
                         }
                         else
                         {
-                            ESP_LOGW(TAG, "PDAT: No target detected, sending error values to Modbus");
+                            ESP_LOGW(TAG, "PDAT: Invalid payload length.");
                         }
+
                         ctx->rs485_slave->write(regs, 3);
                     }
 
+                    // === VERS Handler ===
                     else if (std::strcmp(header, "VERS") == 0)
                     {
                         char fw[65] = {0};
                         int copy_len = (payload_len < 64) ? static_cast<int>(payload_len) : 64;
                         std::memcpy(fw, payload, copy_len);
-                        ESP_LOGI(TAG, "VLD1 Firmware: %s", fw);
+                        ESP_LOGI(TAG, "Firmware: %s", fw);
                     }
+
+                    // === RPST Handler ===
                     else if (std::strcmp(header, "RPST") == 0)
                     {
-                        if (payload_len != sizeof(vld1::radar_params_t))
+                        if (payload_len == sizeof(vld1::radar_params_t))
                         {
-                            ESP_LOGW(TAG, "Payload length mismatch: %" PRIu32 " expected %zu", payload_len, sizeof(vld1::radar_params_t));
-                            break;
+                            ctx->radar_params = *reinterpret_cast<vld1::radar_params_t*>(payload);
+
+                            ESP_LOGI(TAG, "Radar Params Updated:");
+                            ESP_LOGI(TAG, "  FW Ver: %s", ctx->radar_params.firmware_version);
+                            ESP_LOGI(TAG, "  Unique ID: %s", ctx->radar_params.unique_id);
+                            ESP_LOGI(TAG, "  Range: %u", static_cast<uint8_t>(ctx->radar_params.distance_range));
+                            ESP_LOGI(TAG, "  TX Power: %u", ctx->radar_params.tx_power);
                         }
-
-                        ctx->radar_params = *reinterpret_cast<vld1::radar_params_t *>(payload);
-
-                        ESP_LOGI(TAG, "Firmware Version: %s", ctx->radar_params.firmware_version);
-                        ESP_LOGI(TAG, "Unique ID: %s", ctx->radar_params.unique_id);
-                        ESP_LOGI(TAG, "Distance Range: %" PRIu8, static_cast<uint8_t>(ctx->radar_params.distance_range));
-                        ESP_LOGI(TAG, "Threshold Offset [dB]: %" PRIu8, ctx->radar_params.threshold_offset);
-                        ESP_LOGI(TAG, "Min Range Filter: %" PRIu16, ctx->radar_params.min_range_filter);
-                        ESP_LOGI(TAG, "Max Range Filter: %" PRIu16, ctx->radar_params.max_range_filter);
-                        ESP_LOGI(TAG, "Distance Avg Count: %" PRIu8, ctx->radar_params.distance_avg_count);
-                        ESP_LOGI(TAG, "Target Filter: %" PRIu8, static_cast<uint8_t>(ctx->radar_params.target_filter));
-                        ESP_LOGI(TAG, "Distance Precision: %" PRIu8, static_cast<uint8_t>(ctx->radar_params.distance_precision));
-                        ESP_LOGI(TAG, "TX Power: %" PRIu8, ctx->radar_params.tx_power);
-                        ESP_LOGI(TAG, "Chirp Integration Count: %" PRIu8, ctx->radar_params.chirp_integration_count);
-                        ESP_LOGI(TAG, "Short Range Distance Filter: %" PRIu8, static_cast<uint8_t>(ctx->radar_params.short_range_distance_filter));
+                        else
+                        {
+                            ESP_LOGW(TAG, "RPST: payload size mismatch (%" PRIu32 ")", payload_len);
+                        }
                     }
 
                     std::memmove(buffer, buffer + parsed_len, buf_len - parsed_len);
                     buf_len -= parsed_len;
                 }
+
             } while (parsed_len > 0 && buf_len > 0);
         }
     }
@@ -148,8 +151,8 @@ void Application::vld1_read_task(void *arg)
 
 void Application::gnfd_task(void* arg)
 {
-    auto* app = static_cast<Application*>(arg);  // get Application instance
-    vld1& sensor = *app->ctx_.vld1_sensor;      // reference to sensor
+    auto* app = static_cast<Application*>(arg);
+    vld1& sensor = *app->ctx_.vld1_sensor;
 
     while (true)
     {
@@ -161,11 +164,4 @@ void Application::gnfd_task(void* arg)
         sensor.send_packet(header, &payload_gnfd);
         vTaskDelay(pdMS_TO_TICKS(1000));
     }
-}
-
-
-
-void Application::start_gnfd_task()
-{
-    xTaskCreate(gnfd_task, "gnfd_task", 2048, this, 5, nullptr);
 }

@@ -46,6 +46,15 @@ int vld1::parse_message(uint8_t *buffer, int len, char *response_code, uint8_t *
     return static_cast<int>(total_len);
 }
 
+void vld1::set_radar_parameters(const radar_params_t &params_struct) noexcept
+{
+    vld1_header_t header{};
+    std::memcpy(header.header, "SRPS", 4);
+
+    header.payload_len = sizeof(radar_params_t);
+    send_packet(header, reinterpret_cast<const uint8_t *>(&params_struct));
+}
+
 void vld1::set_distance_range(vld1_distance_range_t range) noexcept
 {
     vld1_header_t header{};

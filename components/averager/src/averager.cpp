@@ -23,9 +23,11 @@ void batch_averager::add_sample(double meters) noexcept
         return;
 
     // Step-change limiter: reject unrealistic jumps
-    if (!samples_.empty()) {
+    if (!samples_.empty())
+    {
         double last = samples_.back();
-        if (std::fabs(meters - last) > max_step_) {
+        if (std::fabs(meters - last) > max_step_)
+        {
             return; // discard physical outlier
         }
     }
@@ -36,7 +38,8 @@ void batch_averager::add_sample(double meters) noexcept
     samples_.push_back(meters);
     ++count_;
 
-    if (is_complete()) {
+    if (is_complete())
+    {
         // Apply Hampel filter to remove statistical outliers
         auto filtered = hampel_filter(samples_, hampel_thresh_);
 
@@ -95,7 +98,7 @@ double batch_averager::compute_trimmed_mean(std::vector<double> data, double tri
 //----------------------------------------------
 // Hampel Filter Implementation
 //----------------------------------------------
-std::vector<double> batch_averager::hampel_filter(const std::vector<double>& data, double threshold)
+std::vector<double> batch_averager::hampel_filter(const std::vector<double> &data, double threshold)
 {
     if (data.empty())
         return {};
@@ -124,9 +127,11 @@ std::vector<double> batch_averager::hampel_filter(const std::vector<double>& dat
     double scaled_mad = k * mad;
 
     // Identify and reject outliers
-    for (double x : data) {
+    for (double x : data)
+    {
         double deviation = std::fabs(x - median);
-        if (deviation <= threshold * scaled_mad) {
+        if (deviation <= threshold * scaled_mad)
+        {
             filtered.push_back(x);
         }
     }
