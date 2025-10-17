@@ -55,6 +55,7 @@ extern "C" void app_main()
     app.start_gnfd_task();
     
     static web_server server( vld1_sensor, Application::gnfd_task_handle_ );
+    server.init();
     
 
 }
