@@ -9,34 +9,13 @@ void Application::start()
 
 void Application::start_gnfd_task()
 {
-    if (gnfd_task_handle_ == nullptr)
-    {
-        xTaskCreate(gnfd_task, "gnfd_task", 4096, this, 5, &gnfd_task_handle_);
-        ESP_LOGI(TAG, "GNFD task started.");
-    }
+    xTaskCreate(gnfd_task, "gnfd_task", 4096, this, 5, nullptr);
+    ESP_LOGI(TAG, "GNFD task started.");
 }
 
-void Application::suspend_gnfd_task()
+void Application::vld1_read_task(void *arg)
 {
-    if (gnfd_task_handle_)
-    {
-        vTaskSuspend(gnfd_task_handle_);
-        ESP_LOGW(TAG, "GNFD task suspended for radar parameter update.");
-    }
-}
-
-void Application::resume_gnfd_task()
-{
-    if (gnfd_task_handle_)
-    {
-        vTaskResume(gnfd_task_handle_);
-        ESP_LOGI(TAG, "GNFD task resumed after radar parameter update.");
-    }
-}
-
-void Application::vld1_read_task(void* arg)
-{
-    auto* ctx = static_cast<AppContext*>(arg);
+    auto *ctx = static_cast<AppContext *>(arg);
     uint8_t buffer[512];
     int buf_len = 0;
 
@@ -65,15 +44,41 @@ void Application::vld1_read_task(void* arg)
 
                         switch (error_code)
                         {
-                            case 0: ESP_LOGI(TAG, "VLD1 RESP: OK"); break;
-                            case 1: ESP_LOGW(TAG, "RESP: Unknown command"); ctx->rs485_slave->write(regs, 3); break;
-                            case 2: ESP_LOGW(TAG, "RESP: Invalid parameter value"); ctx->rs485_slave->write(regs, 3); break;
-                            case 3: ESP_LOGW(TAG, "RESP: Invalid RPST version"); ctx->rs485_slave->write(regs, 3); break;
-                            case 4: ESP_LOGW(TAG, "RESP: UART error"); ctx->rs485_slave->write(regs, 3); break;
-                            case 5: ESP_LOGW(TAG, "RESP: No calibration values"); ctx->rs485_slave->write(regs, 3); break;
-                            case 6: ESP_LOGW(TAG, "RESP: Timeout"); ctx->rs485_slave->write(regs, 3); break;
-                            case 7: ESP_LOGW(TAG, "RESP: Application corrupt"); ctx->rs485_slave->write(regs, 3); break;
-                            default: ESP_LOGW(TAG, "RESP: Unknown error code %u", error_code); ctx->rs485_slave->write(regs, 3); break;
+                        case 0:
+                            ESP_LOGI(TAG, "VLD1 RESP: OK");
+                            break;
+                        case 1:
+                            ESP_LOGW(TAG, "RESP: Unknown command");
+                            ctx->rs485_slave->write(regs, 3);
+                            break;
+                        case 2:
+                            ESP_LOGW(TAG, "RESP: Invalid parameter value");
+                            ctx->rs485_slave->write(regs, 3);
+                            break;
+                        case 3:
+                            ESP_LOGW(TAG, "RESP: Invalid RPST version");
+                            ctx->rs485_slave->write(regs, 3);
+                            break;
+                        case 4:
+                            ESP_LOGW(TAG, "RESP: UART error");
+                            ctx->rs485_slave->write(regs, 3);
+                            break;
+                        case 5:
+                            ESP_LOGW(TAG, "RESP: No calibration values");
+                            ctx->rs485_slave->write(regs, 3);
+                            break;
+                        case 6:
+                            ESP_LOGW(TAG, "RESP: Timeout");
+                            ctx->rs485_slave->write(regs, 3);
+                            break;
+                        case 7:
+                            ESP_LOGW(TAG, "RESP: Application corrupt");
+                            ctx->rs485_slave->write(regs, 3);
+                            break;
+                        default:
+                            ESP_LOGW(TAG, "RESP: Unknown error code %u", error_code);
+                            ctx->rs485_slave->write(regs, 3);
+                            break;
                         }
                     }
 
@@ -84,7 +89,7 @@ void Application::vld1_read_task(void* arg)
 
                         if (payload_len >= sizeof(vld1::pdat_resp_t))
                         {
-                            auto* pdat = reinterpret_cast<vld1::pdat_resp_t*>(payload);
+                            auto *pdat = reinterpret_cast<vld1::pdat_resp_t *>(payload);
                             float distance_m = pdat->distance;
                             uint16_t distance_mm = static_cast<uint16_t>(distance_m * 1000.0f);
 
@@ -126,7 +131,7 @@ void Application::vld1_read_task(void* arg)
                     {
                         if (payload_len == sizeof(vld1::radar_params_t))
                         {
-                            ctx->radar_params = *reinterpret_cast<vld1::radar_params_t*>(payload);
+                            ctx->radar_params = *reinterpret_cast<vld1::radar_params_t *>(payload);
 
                             ESP_LOGI(TAG, "Radar Params Updated:");
                             ESP_LOGI(TAG, "  FW Ver: %s", ctx->radar_params.firmware_version);
@@ -149,19 +154,29 @@ void Application::vld1_read_task(void* arg)
     }
 }
 
-void Application::gnfd_task(void* arg)
+void Application::gnfd_task(void *arg)
 {
-    auto* app = static_cast<Application*>(arg);
-    vld1& sensor = *app->ctx_.vld1_sensor;
+    auto *app = static_cast<Application *>(arg);
+    vld1 &sensor = *app->ctx_.vld1_sensor;
 
     while (true)
     {
-        const uint8_t payload_gnfd = 0x04;
-        vld1::vld1_header_t header{};
-        std::memcpy(header.header, "GNFD", 4);
-        header.payload_len = 1;
+        if (xSemaphoreTake(app->uart_mutex_, pdMS_TO_TICKS(100)) == pdTRUE)
+        {
+            const uint8_t payload_gnfd = 0x04;
+            vld1::vld1_header_t header{};
+            std::memcpy(header.header, "GNFD", 4);
+            header.payload_len = 1;
 
-        sensor.send_packet(header, &payload_gnfd);
+            sensor.send_packet(header, &payload_gnfd);
+
+            xSemaphoreGive(app->uart_mutex_);
+        }
+        else
+        {
+            ESP_LOGV(TAG, "GNFD: Could not acquire mutex, skipping this cycle");
+        }
+
         vTaskDelay(pdMS_TO_TICKS(1000));
     }
 }

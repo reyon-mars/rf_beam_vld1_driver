@@ -7,15 +7,14 @@
 #include "web_server.hpp"
 #include "cJSON.h"
 #include <cstring>
+#include <memory>
 
 static const char *TAG = "web_server";
 
-// ========================== Constructor / Destructor ==========================
-
-web_server::web_server(vld1 &sensor, TaskHandle_t gnfd_task) noexcept
+web_server::web_server(vld1 &sensor, SemaphoreHandle_t uart_mutex) noexcept
     : server_(nullptr),
       sensor_(sensor),
-      gnfd_task_(gnfd_task),
+      uart_mutex_(uart_mutex),
       ssid_("VLD1_AP"),
       password_("12345678"),
       ip_("192.168.4.1"),
@@ -28,13 +27,10 @@ web_server::~web_server()
     deinit();
 }
 
-// ============================ SoftAP Setup ====================================
-
 esp_err_t web_server::initSoftAP()
 {
-    static const char* TAG = "web_server";
+    static const char *TAG = "web_server";
 
-    // --- Step 1: Initialize NVS ---
     esp_err_t ret = nvs_flash_init();
     if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND)
     {
@@ -44,22 +40,18 @@ esp_err_t web_server::initSoftAP()
     }
     ESP_ERROR_CHECK(ret);
 
-    // --- Step 2: Initialize Network Stack ---
     ESP_ERROR_CHECK(esp_netif_init());
     ESP_ERROR_CHECK(esp_event_loop_create_default());
 
-    // --- Step 3: Create Default Wi-Fi AP Interface ---
     esp_netif_create_default_wifi_ap();
 
-    // --- Step 4: Initialize Wi-Fi driver ---
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
     ESP_ERROR_CHECK(esp_wifi_init(&cfg));
 
-    // --- Step 5: Configure SoftAP parameters ---
     wifi_config_t wifi_config = {};
-    strcpy((char*)wifi_config.ap.ssid, "ESP32_AP");
+    strcpy((char *)wifi_config.ap.ssid, "ESP32_AP");
     wifi_config.ap.ssid_len = strlen("ESP32_AP");
-    strcpy((char*)wifi_config.ap.password, "12345678");
+    strcpy((char *)wifi_config.ap.password, "12345678");
     wifi_config.ap.authmode = WIFI_AUTH_WPA_WPA2_PSK;
     wifi_config.ap.max_connection = 4;
 
@@ -92,30 +84,29 @@ void web_server::updateIPAddress()
     }
 }
 
-// ============================ HTTP Server =====================================
-
 esp_err_t web_server::init()
 {
-    static const char* TAG = "web_server";
+    static const char *TAG = "web_server";
 
-    if (is_initialized_) {
+    if (is_initialized_)
+    {
         ESP_LOGW(TAG, "Web server already initialized; skipping reinit.");
         return ESP_OK;
     }
 
-    // Initialize SoftAP
     esp_err_t ret = initSoftAP();
-    if (ret != ESP_OK) {
+    if (ret != ESP_OK)
+    {
         ESP_LOGE(TAG, "Failed to initialize SoftAP: %s", esp_err_to_name(ret));
         return ret;
     }
 
-    // --- Start HTTP Server ---
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
     config.server_port = 80;
 
     ret = httpd_start(&server_, &config);
-    if (ret != ESP_OK) {
+    if (ret != ESP_OK)
+    {
         ESP_LOGE(TAG, "Failed to start HTTP server: %s", esp_err_to_name(ret));
         return ret;
     }
@@ -128,7 +119,6 @@ esp_err_t web_server::init()
     return ESP_OK;
 }
 
-
 void web_server::deinit()
 {
     if (server_)
@@ -140,8 +130,6 @@ void web_server::deinit()
     esp_wifi_deinit();
     is_initialized_ = false;
 }
-
-// ============================ Handlers ========================================
 
 void *web_server::getServerFromRequest(httpd_req_t *req)
 {
@@ -220,90 +208,93 @@ function submitForm() {
     return httpd_resp_send(req, html, HTTPD_RESP_USE_STRLEN);
 }
 
-// --- POST /config: Handle radar parameter update safely ---
 esp_err_t web_server::handlePostConfig(httpd_req_t *req)
 {
     auto *self = static_cast<web_server *>(req->user_ctx);
-    if (!self) {
+    if (!self)
+    {
         ESP_LOGE(TAG, "User context is NULL");
         return ESP_FAIL;
     }
 
     ESP_LOGI(TAG, "handlePostConfig() initiated");
 
-    // Allocate buffer (+1 for null terminator)
     const size_t buf_len = req->content_len + 1;
     std::unique_ptr<char[]> buf(new char[buf_len]);
     memset(buf.get(), 0, buf_len);
 
     int ret = httpd_req_recv(req, buf.get(), req->content_len);
-    if (ret <= 0) {
+    if (ret <= 0)
+    {
         ESP_LOGE(TAG, "Failed to read request body");
         httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to read request body");
         return ESP_FAIL;
     }
 
-    buf[ret] = '\0'; // Ensure null termination
+    buf[ret] = '\0';
 
     cJSON *root = cJSON_Parse(buf.get());
-    if (!root) {
+    if (!root)
+    {
         ESP_LOGE(TAG, "Invalid JSON payload");
         httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid JSON");
         return ESP_FAIL;
     }
 
-    // Suspend GNFD task (UART exclusivity)
-    if (self->gnfd_task_) {
-        vTaskSuspend(self->gnfd_task_);
-    }
-
     vld1::radar_params_t params{};
-    auto get_str = [&](const char *key) -> std::string {
+    auto get_str = [&](const char *key) -> std::string
+    {
         const cJSON *item = cJSON_GetObjectItem(root, key);
         return (cJSON_IsString(item) && item->valuestring) ? item->valuestring : "";
     };
-    auto get_num = [&](const char *key, double default_val = 0.0) -> double {
+    auto get_num = [&](const char *key, double default_val = 0.0) -> double
+    {
         const cJSON *item = cJSON_GetObjectItem(root, key);
         return cJSON_IsNumber(item) ? item->valuedouble : default_val;
     };
 
-    // Copy string fields safely
     std::string fw_ver = get_str("firmware_version");
-    std::string uid    = get_str("unique_id");
+    std::string uid = get_str("unique_id");
     std::strncpy(params.firmware_version, fw_ver.c_str(), sizeof(params.firmware_version) - 1);
     params.firmware_version[sizeof(params.firmware_version) - 1] = '\0';
     std::strncpy(params.unique_id, uid.c_str(), sizeof(params.unique_id) - 1);
     params.unique_id[sizeof(params.unique_id) - 1] = '\0';
 
-    // Copy numeric fields
-    params.distance_range              = static_cast<vld1::vld1_distance_range_t>(get_num("distance_range"));
-    params.threshold_offset            = static_cast<uint8_t>(get_num("threshold_offset"));
-    params.min_range_filter            = static_cast<uint16_t>(get_num("min_range_filter"));
-    params.max_range_filter            = static_cast<uint16_t>(get_num("max_range_filter"));
-    params.distance_avg_count          = static_cast<uint8_t>(get_num("distance_avg_count"));
-    params.target_filter               = static_cast<vld1::target_filter_t>(get_num("target_filter"));
-    params.distance_precision          = static_cast<vld1::precision_mode_t>(get_num("distance_precision"));
-    params.tx_power                    = static_cast<uint8_t>(get_num("tx_power"));
-    params.chirp_integration_count     = static_cast<uint8_t>(get_num("chirp_integration_count"));
+    params.distance_range = static_cast<vld1::vld1_distance_range_t>(get_num("distance_range"));
+    params.threshold_offset = static_cast<uint8_t>(get_num("threshold_offset"));
+    params.min_range_filter = static_cast<uint16_t>(get_num("min_range_filter"));
+    params.max_range_filter = static_cast<uint16_t>(get_num("max_range_filter"));
+    params.distance_avg_count = static_cast<uint8_t>(get_num("distance_avg_count"));
+    params.target_filter = static_cast<vld1::target_filter_t>(get_num("target_filter"));
+    params.distance_precision = static_cast<vld1::precision_mode_t>(get_num("distance_precision"));
+    params.tx_power = static_cast<uint8_t>(get_num("tx_power"));
+    params.chirp_integration_count = static_cast<uint8_t>(get_num("chirp_integration_count"));
     params.short_range_distance_filter = static_cast<vld1::short_range_distance_t>(get_num("short_range_distance_filter"));
 
-    // Apply parameters safely
-    self->sensor_.set_radar_parameters(params);
+    if (xSemaphoreTake(self->uart_mutex_, pdMS_TO_TICKS(5000)) == pdTRUE)
+    {
+        ESP_LOGI(TAG, "Mutex acquired, updating radar parameters...");
+
+        self->sensor_.set_radar_parameters(params);
+
+        xSemaphoreGive(self->uart_mutex_);
+        ESP_LOGI(TAG, "Mutex released after parameter update");
+    }
+    else
+    {
+        ESP_LOGE(TAG, "Failed to acquire UART mutex - timeout");
+        cJSON_Delete(root);
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "UART busy");
+        return ESP_FAIL;
+    }
 
     cJSON_Delete(root);
-
-    // Resume GNFD task
-    if (self->gnfd_task_) {
-        vTaskResume(self->gnfd_task_);
-    }
 
     const char resp[] = "{\"status\":\"ok\",\"message\":\"Radar parameters updated\"}";
     httpd_resp_set_type(req, "application/json");
     return httpd_resp_send(req, resp, HTTPD_RESP_USE_STRLEN);
 }
 
-
-// --- Register Handlers ---
 void web_server::registerHandlers()
 {
     httpd_uri_t root_uri = {

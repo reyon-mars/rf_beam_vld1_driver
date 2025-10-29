@@ -1,44 +1,38 @@
-#pragma once
-
-#include "esp_http_server.h"
-#include "esp_netif.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "freertos/semphr.h"
+#include "esp_http_server.h"
 #include "vld1.hpp"
-
 #include <string>
-#include <memory>
 
 class web_server
 {
 public:
-    explicit web_server(vld1& sensor, TaskHandle_t gnfd_task = nullptr) noexcept;
+    web_server(vld1 &sensor, SemaphoreHandle_t uart_mutex) noexcept;
     ~web_server();
 
     esp_err_t init();
     void deinit();
 
+    const std::string &getSSID() const { return ssid_; }
+    const std::string &getPassword() const { return password_; }
+    const std::string &getIP() const { return ip_; }
+
 private:
-    // Core handles
-    httpd_handle_t server_;
-    vld1& sensor_;
-    TaskHandle_t gnfd_task_;
-
-    // Wi-Fi credentials and IP
-    std::string ssid_;
-    std::string password_;
-    std::string ip_;
-    bool is_initialized_;
-
-    // Internal setup
     esp_err_t initSoftAP();
     void updateIPAddress();
     void registerHandlers();
 
-    // HTTP handlers
-    static esp_err_t handleRoot(httpd_req_t* req);
-    static esp_err_t handlePostConfig(httpd_req_t* req);
+    static esp_err_t handleRoot(httpd_req_t *req);
+    static esp_err_t handlePostConfig(httpd_req_t *req);
+    static void *getServerFromRequest(httpd_req_t *req);
 
-    // Context accessor
-    static void* getServerFromRequest(httpd_req_t* req);
+    httpd_handle_t server_;
+    vld1 &sensor_;
+    SemaphoreHandle_t uart_mutex_;
+
+    std::string ssid_;
+    std::string password_;
+    std::string ip_;
+    bool is_initialized_;
 };
