@@ -177,6 +177,6 @@ void Application::gnfd_task(void *arg)
             ESP_LOGV(TAG, "GNFD: Could not acquire mutex, skipping this cycle");
         }
 
-        vTaskDelay(pdMS_TO_TICKS(1000));
+        vTaskDelay(pdMS_TO_TICKS(1000)); 
     }
 }

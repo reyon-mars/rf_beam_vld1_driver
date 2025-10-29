@@ -217,7 +217,7 @@ esp_err_t web_server::handlePostConfig(httpd_req_t *req)
         return ESP_FAIL;
     }
 
-    ESP_LOGI(TAG, "handlePostConfig() initiated");
+    // ESP_LOGI(TAG, "handlePostConfig() initiated");
 
     const size_t buf_len = req->content_len + 1;
     std::unique_ptr<char[]> buf(new char[buf_len]);
@@ -273,6 +273,7 @@ esp_err_t web_server::handlePostConfig(httpd_req_t *req)
 
     if (xSemaphoreTake(self->uart_mutex_, pdMS_TO_TICKS(5000)) == pdTRUE)
     {
+        self->sensor_.flush_buffer();
         ESP_LOGI(TAG, "Mutex acquired, updating radar parameters...");
 
         self->sensor_.set_radar_parameters(params);

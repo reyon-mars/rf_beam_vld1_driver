@@ -21,6 +21,8 @@ void vld1::send_packet(const vld1_header_t &header, const uint8_t *payload) noex
 
     if (header.payload_len && payload)
         std::memcpy(buf + sizeof(vld1_header_t), payload, header.payload_len);
+    
+    ESP_LOG_BUFFER_HEXDUMP(TAG, buf, total_len, ESP_LOG_WARN);
     uart_.write(buf, total_len);
 }
 
@@ -151,4 +153,9 @@ void vld1::set_short_range_distance_filter(short_range_distance_t state) noexcep
     header.payload_len = sizeof(payload);
 
     send_packet(header, &payload);
+}
+
+void vld1::flush_buffer ( void )
+{
+    uart_.flush_buffer();
 }

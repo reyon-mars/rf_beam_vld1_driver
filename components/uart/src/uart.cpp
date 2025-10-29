@@ -77,3 +77,8 @@ int uart::write(const uint8_t *data, size_t len) noexcept
     }
     return written;
 }
+
+void uart::flush_buffer ( void ) noexcept
+{
+    uart_flush_input(port_);
+}

@@ -80,7 +80,7 @@ public:
     void set_tx_power(uint8_t power) noexcept;
     void set_short_range_distance_filter(short_range_distance_t state) noexcept;
     void exit_sequence() noexcept;
-
+    void flush_buffer ( void ) noexcept;
     void get_parameters(radar_params_t &params) noexcept;
 
 private:

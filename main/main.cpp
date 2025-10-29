@@ -10,12 +10,14 @@
 #include "esp_log.h"
 #include <cstring>
 
+
+
 static constexpr char TAG[] = "Main";
 
 extern "C" void app_main()
 {
     ESP_LOGI(TAG, "Starting VLD1 app");
-
+    ESP_LOGW(TAG, "sizeof(radar_params_t): %d", sizeof(vld1::radar_params_t));
     // Setup the uart for the vld1 sensor
     static uart vld1_uart(UART_NUM_1, 12, 13, 115200, 512);
     vld1_uart.init(UART_DATA_8_BITS, UART_PARITY_EVEN, UART_STOP_BITS_1);
