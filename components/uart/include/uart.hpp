@@ -15,8 +15,9 @@ public:
                    uart_stop_bits_t stop_bits = UART_STOP_BITS_1) noexcept;
 
     int read(uint8_t *dst, size_t max_len, TickType_t ticks_to_wait) noexcept;
+    esp_err_t read_exact(uint8_t *dst, size_t max_len, TickType_t ticks_to_wait) noexcept;
     int write(const uint8_t *data, size_t len) noexcept;
-    void flush_buffer ( void ) noexcept;
+    void flush_buffer(void) noexcept;
     int baud_rate() const noexcept { return config_.baud_rate; }
     uart_word_length_t data_bits() const noexcept { return config_.data_bits; }
     uart_parity_t parity() const noexcept { return config_.parity; }
