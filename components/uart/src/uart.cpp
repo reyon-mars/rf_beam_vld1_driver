@@ -63,7 +63,7 @@ esp_err_t uart::init(uart_word_length_t data_bits, uart_parity_t parity, uart_st
     return ESP_OK;
 }
 
-inline int uart::read(uint8_t *dst, size_t max_len, TickType_t ticks_to_wait) noexcept
+int uart::read(uint8_t *dst, size_t max_len, TickType_t ticks_to_wait) noexcept
 {
     return uart_read_bytes(port_, dst, max_len, ticks_to_wait);
 }
