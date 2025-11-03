@@ -49,9 +49,9 @@ extern "C" void app_main()
     server.init();
 
     ESP_LOGI(TAG, "System initialized successfully");
-    ESP_LOGI(TAG, "Connect to SSID: %s", server.getSSID().c_str());
-    ESP_LOGI(TAG, "Password: %s", server.getPassword().c_str());
-    ESP_LOGI(TAG, "Access web interface at: http://%s", server.getIP().c_str());
+    ESP_LOGI(TAG, "Connect to SSID: %s", server.get_ssid().c_str());
+    ESP_LOGI(TAG, "Password: %s", server.get_password().c_str());
+    ESP_LOGI(TAG, "Access web interface at: http://%s", server.get_ip().c_str());
 
     app.start_read_and_forward();
 }

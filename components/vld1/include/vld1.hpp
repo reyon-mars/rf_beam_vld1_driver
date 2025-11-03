@@ -15,6 +15,7 @@ public:
         NO_CALIB_VALUES = 5,
         TIMEOUT = 6,
         APP_CORRUPT = 7,
+        RESP_FRAME_ERR = 8,
     };
 
     enum class vld1_baud_t : uint8_t
@@ -175,7 +176,7 @@ public:
     esp_err_t exit_sequence() noexcept;
 
 private:
-    esp_err_t resp_status(void) noexcept;
+    vld1_error_code_t resp_status(void) noexcept;
 
     uart &uart_;
     SemaphoreHandle_t vld1_mutex_;

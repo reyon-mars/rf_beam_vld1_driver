@@ -59,7 +59,7 @@ int vld1::parse_message(uint8_t *buffer, int len, char *response_code,
     return static_cast<int>(total_len);
 }
 
-esp_err_t vld1::resp_status() noexcept
+vld1::vld1_error_code_t vld1::resp_status() noexcept
 {
     resp_t resp_data{};
     esp_err_t err = uart_.read_exact(reinterpret_cast<uint8_t *>(&resp_data), sizeof(resp_t));
@@ -67,14 +67,14 @@ esp_err_t vld1::resp_status() noexcept
     if (err != ESP_OK)
     {
         ESP_LOGE(TAG, "Insufficient bytes read.");
-        return ESP_FAIL;
+        return vld1_error_code_t::RESP_FRAME_ERR;
     }
 
     if (std::strncmp(resp_data.header.header, "RESP", 4) != 0 ||
         resp_data.header.payload_len != sizeof(vld1_error_code_t))
     {
         ESP_LOGE(TAG, "Invalid response header or payload length.");
-        return ESP_FAIL;
+        return vld1_error_code_t::RESP_FRAME_ERR;
     }
 
     switch (resp_data.err_code)
@@ -117,7 +117,7 @@ esp_err_t vld1::resp_status() noexcept
         break;
     }
 
-    return ESP_OK;
+    return resp_data.err_code;
 }
 
 esp_err_t vld1::get_parameters(void) noexcept
@@ -134,14 +134,11 @@ esp_err_t vld1::get_parameters(void) noexcept
 
     send_packet(header, nullptr);
 
-    esp_err_t err = resp_status();
-    if (err != ESP_OK)
-    {
-        return err;
-    }
+    if (resp_status() != vld1_error_code_t::OK)
+        return ESP_FAIL;
 
     rpst_resp_t rpst_data{};
-    err = uart_.read_exact(reinterpret_cast<uint8_t *>(&rpst_data), sizeof(rpst_resp_t));
+    esp_err_t err = uart_.read_exact(reinterpret_cast<uint8_t *>(&rpst_data), sizeof(rpst_resp_t));
     if (err != ESP_OK)
     {
         return err;
@@ -207,12 +204,11 @@ esp_err_t vld1::get_pdat(pdat_payload_t &pdat_data) noexcept
 
     send_packet(gnfd_req.header, reinterpret_cast<const uint8_t *>(&gnfd_req.payload));
 
-    esp_err_t err = resp_status();
-    if (err != ESP_OK)
-        return err;
+    if (resp_status() != vld1_error_code_t::OK)
+        return ESP_FAIL;
 
     pdat_resp_t pdat_resp{};
-    err = uart_.read_exact(reinterpret_cast<uint8_t *>(&pdat_resp), sizeof(pdat_resp_t));
+    esp_err_t err = uart_.read_exact(reinterpret_cast<uint8_t *>(&pdat_resp), sizeof(pdat_resp_t));
     if (err != ESP_OK)
         return err;
 
@@ -257,16 +253,11 @@ esp_err_t vld1::init(const vld1_baud_t baud) noexcept
 
     send_packet(header, &payload);
 
-    esp_err_t err = resp_status();
-
-    if (err != ESP_OK)
-    {
-        ESP_LOGE(TAG, "Invalid response received.");
-        return err;
-    }
+    if (resp_status() != vld1_error_code_t::OK)
+        return ESP_FAIL;
 
     vers_resp_t vers_resp{};
-    err = uart_.read_exact(reinterpret_cast<uint8_t *>(&vers_resp), sizeof(vers_resp_t));
+    esp_err_t err = uart_.read_exact(reinterpret_cast<uint8_t *>(&vers_resp), sizeof(vers_resp_t));
 
     if (err != ESP_OK)
     {
@@ -297,7 +288,11 @@ esp_err_t vld1::set_radar_parameters(const radar_params_t &params_struct) noexce
     header.payload_len = sizeof(radar_params_t);
     send_packet(header, reinterpret_cast<const uint8_t *>(&params_struct));
 
-    return resp_status();
+    if (resp_status() != vld1_error_code_t::OK)
+        return ESP_FAIL;
+
+    std::memcpy(&vld1_config_, &params_struct, sizeof(radar_params_t));
+    return ESP_OK;
 }
 
 esp_err_t vld1::set_distance_range(vld1_distance_range_t range) noexcept
@@ -315,7 +310,10 @@ esp_err_t vld1::set_distance_range(vld1_distance_range_t range) noexcept
 
     send_packet(header, &payload);
 
-    return resp_status();
+    if (resp_status() != vld1_error_code_t::OK)
+        return ESP_FAIL;
+
+    return ESP_OK;
 }
 
 esp_err_t vld1::set_threshold_offset(uint8_t val) noexcept
@@ -331,7 +329,10 @@ esp_err_t vld1::set_threshold_offset(uint8_t val) noexcept
     header.payload_len = sizeof(val);
     send_packet(header, &val);
 
-    return resp_status();
+    if (resp_status() != vld1_error_code_t::OK)
+        return ESP_FAIL;
+
+    return ESP_OK;
 }
 
 esp_err_t vld1::set_min_range_filter(uint16_t val) noexcept
@@ -347,7 +348,10 @@ esp_err_t vld1::set_min_range_filter(uint16_t val) noexcept
     header.payload_len = sizeof(val);
     send_packet(header, reinterpret_cast<const uint8_t *>(&val));
 
-    return resp_status();
+    if (resp_status() != vld1_error_code_t::OK)
+        return ESP_FAIL;
+
+    return ESP_OK;
 }
 
 esp_err_t vld1::set_max_range_filter(uint16_t val) noexcept
@@ -363,7 +367,10 @@ esp_err_t vld1::set_max_range_filter(uint16_t val) noexcept
     header.payload_len = sizeof(val);
     send_packet(header, reinterpret_cast<const uint8_t *>(&val));
 
-    return resp_status();
+    if (resp_status() != vld1_error_code_t::OK)
+        return ESP_FAIL;
+
+    return ESP_OK;
 }
 
 esp_err_t vld1::set_target_filter(target_filter_t filter) noexcept
@@ -381,7 +388,10 @@ esp_err_t vld1::set_target_filter(target_filter_t filter) noexcept
 
     send_packet(header, &payload);
 
-    return resp_status();
+    if (resp_status() != vld1_error_code_t::OK)
+        return ESP_FAIL;
+
+    return ESP_OK;
 }
 
 esp_err_t vld1::set_precision_mode(precision_mode_t mode) noexcept
@@ -399,7 +409,10 @@ esp_err_t vld1::set_precision_mode(precision_mode_t mode) noexcept
 
     send_packet(header, &payload);
 
-    return resp_status();
+    if (resp_status() != vld1_error_code_t::OK)
+        return ESP_FAIL;
+
+    return ESP_OK;
 }
 
 esp_err_t vld1::exit_sequence() noexcept
@@ -415,7 +428,10 @@ esp_err_t vld1::exit_sequence() noexcept
     header.payload_len = 0;
     send_packet(header, nullptr);
 
-    return resp_status();
+    if (resp_status() != vld1_error_code_t::OK)
+        return ESP_FAIL;
+
+    return ESP_OK;
 }
 
 esp_err_t vld1::set_chirp_integration_count(uint8_t val) noexcept
@@ -432,7 +448,10 @@ esp_err_t vld1::set_chirp_integration_count(uint8_t val) noexcept
     header.payload_len = sizeof(val);
     send_packet(header, &val);
 
-    return resp_status();
+    if (resp_status() != vld1_error_code_t::OK)
+        return ESP_FAIL;
+
+    return ESP_OK;
 }
 
 esp_err_t vld1::set_tx_power(uint8_t power) noexcept
@@ -448,7 +467,10 @@ esp_err_t vld1::set_tx_power(uint8_t power) noexcept
     header.payload_len = sizeof(power);
     send_packet(header, &power);
 
-    return resp_status();
+    if (resp_status() != vld1_error_code_t::OK)
+        return ESP_FAIL;
+
+    return ESP_OK;
 }
 
 esp_err_t vld1::set_short_range_distance_filter(short_range_distance_t state) noexcept
@@ -466,7 +488,10 @@ esp_err_t vld1::set_short_range_distance_filter(short_range_distance_t state) no
 
     send_packet(header, &payload);
 
-    return resp_status();
+    if (resp_status() != vld1_error_code_t::OK)
+        return ESP_FAIL;
+
+    return ESP_OK;
 }
 
 void vld1::flush_buffer()

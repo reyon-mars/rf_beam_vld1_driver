@@ -189,7 +189,7 @@ esp_err_t web_server::serve_config_page(httpd_req_t *req, const vld1::radar_para
     if (ret != ESP_OK)
         return ret;
 
-    snprintf(buffer, sizeof(buffer), g_vld1_header, "", "", "", "", "", "", "", "");
+    snprintf(buffer, sizeof(buffer), g_vld1_header);
     ret = httpd_resp_sendstr_chunk(req, buffer);
     if (ret != ESP_OK)
         return ret;
