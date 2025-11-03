@@ -1,6 +1,6 @@
 /*
- * vld1_config_html.hpp
- * Description: Page layout for Dynamic web content using formatted buffer print.
+ * vld1_config_form.hpp
+ * Description: Page layout for serving Dynamic web content using formatted buffer print.
  *  Created on: Nov 03, 2025
  *      Author: Reyon Rai
  */
@@ -41,10 +41,7 @@ const char g_style3[] =
 const char g_style_end[] = "</style></head>";
 
 const char g_vld1_header[] =
-    "<body><header><div id=\"header-inner\"><h2 class=\"name\">VLD1 Radar Configuration</h2><nav><a href=\"#\" id=\"menu-icon\">&#9776</a>"
-    "<ul><li><a href=\"\\\" class=\"%s\">WiFi Settings</a></li><li><a href=\"email_config\" class=\"%s\">Email Settings</a></li><li><a href=\"comm_config\" class=\"%s\">Communication</a></li>"
-    "<li><a href=\"hotspot_config\" class=\"%s\">Hotspot Settings</a></li><li><a href=\"device_config\" class=\"%s\">Device</a></li><li><a href=\"sensor_config\" class=\"%s\">Sensor</a></li>"
-    "<li><a href=\"local_cfg\" class=\"%s\">Local Server</a></li><li><a href=\"vld1_config\" class=\"current\">VLD1 Config</a></li><li><a href=\"about_config\" class=\"%s\">About</a></li></ul></nav></div></header>";
+    "<body><header><div id=\"header-inner\"><h2 class=\"name\">VLD1 Radar Configuration</h2></div></header>";
 
 const char g_vld1_container[] =
     "<div class=\"container\"><form id=\"configForm\" method=\"post\">";

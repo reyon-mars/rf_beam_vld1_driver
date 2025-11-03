@@ -128,17 +128,9 @@ void web_server::deinit()
     is_initialized_ = false;
 }
 
-void *web_server::getServerFromRequest(httpd_req_t *req)
+void *web_server::get_server_from_req(httpd_req_t *req)
 {
     return req->user_ctx;
-}
-
-esp_err_t web_server::handle_root(httpd_req_t *req)
-{
-    auto *self = static_cast<web_server *>(req->user_ctx);
-    vld1::radar_params_t config = self->sensor_.get_curr_radar_params();
-
-    return self->serve_config_page(req, config);
 }
 
 void web_server::register_handlers()
@@ -156,6 +148,14 @@ void web_server::register_handlers()
         .handler = handle_post_config,
         .user_ctx = this};
     httpd_register_uri_handler(server_, &post_uri);
+}
+
+esp_err_t web_server::handle_root(httpd_req_t *req)
+{
+    auto *self = static_cast<web_server *>(req->user_ctx);
+    vld1::radar_params_t config = self->sensor_.get_curr_radar_params();
+
+    return self->serve_config_page(req, config);
 }
 
 esp_err_t web_server::serve_config_page(httpd_req_t *req, const vld1::radar_params_t &config)
@@ -286,7 +286,6 @@ esp_err_t web_server::serve_config_page(httpd_req_t *req, const vld1::radar_para
     return httpd_resp_sendstr_chunk(req, NULL);
 }
 
-
 esp_err_t web_server::handle_post_config(httpd_req_t *req)
 {
     auto *self = static_cast<web_server *>(req->user_ctx);
@@ -297,23 +296,30 @@ esp_err_t web_server::handle_post_config(httpd_req_t *req)
         return ESP_FAIL;
     }
 
-    // Read request body
-    const size_t buf_len = req->content_len + 1;
-    std::unique_ptr<char[]> buf(new char[buf_len]);
-    memset(buf.get(), 0, buf_len);
+    size_t remaining = req->content_len;
+    std::unique_ptr<char[]> buf(new char[remaining + 1]);
+    char *p = buf.get();
+    std::memset(p, 0, remaining);
 
-    int ret = httpd_req_recv(req, buf.get(), req->content_len);
-    if (ret <= 0)
+    while (remaining > 0)
     {
-        ESP_LOGE(TAG, "Failed to read request body");
-        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to read request body");
-        return ESP_FAIL;
+        int ret = httpd_req_recv(req, p, remaining);
+        if (ret <= 0)
+        {
+            if (ret == HTTPD_SOCK_ERR_TIMEOUT)
+                continue;
+            ESP_LOGE(TAG, "Failed to read request body");
+            httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to read request body");
+            return ESP_FAIL;
+        }
+        p += ret;
+        remaining -= ret;
     }
-    buf[ret] = '\0';
+
+    buf[req->content_len] = '\0';
 
     ESP_LOGI(TAG, "Received POST data: %s", buf.get());
 
-    // Parse JSON
     cJSON *root = cJSON_Parse(buf.get());
     if (!root)
     {
@@ -322,7 +328,6 @@ esp_err_t web_server::handle_post_config(httpd_req_t *req)
         return ESP_FAIL;
     }
 
-    // Helper lambdas for JSON parsing
     auto get_str = [&](const char *key) -> std::string
     {
         const cJSON *item = cJSON_GetObjectItem(root, key);
@@ -335,9 +340,8 @@ esp_err_t web_server::handle_post_config(httpd_req_t *req)
         return cJSON_IsNumber(item) ? item->valuedouble : default_val;
     };
 
-    // Parse parameters from JSON
     vld1::radar_params_t params{};
-    
+
     std::string fw_ver = get_str("firmware_version");
     std::string uid = get_str("unique_id");
     std::strncpy(params.firmware_version, fw_ver.c_str(), sizeof(params.firmware_version) - 1);
@@ -356,7 +360,6 @@ esp_err_t web_server::handle_post_config(httpd_req_t *req)
     params.chirp_integration_count = static_cast<uint8_t>(get_num("chirp_integration_count"));
     params.short_range_distance_filter = static_cast<vld1::short_range_distance_t>(static_cast<uint8_t>(get_num("short_range_distance_filter")));
 
-    // Log parsed parameters
     ESP_LOGI(TAG, "Parsed parameters:");
     ESP_LOGI(TAG, "  Distance Range: %d", static_cast<int>(params.distance_range));
     ESP_LOGI(TAG, "  Threshold Offset: %u", params.threshold_offset);
@@ -369,18 +372,11 @@ esp_err_t web_server::handle_post_config(httpd_req_t *req)
     ESP_LOGI(TAG, "  Chirp Integration Count: %u", params.chirp_integration_count);
     ESP_LOGI(TAG, "  Short Range Filter: %d", static_cast<int>(params.short_range_distance_filter));
 
-    // Clean up JSON
     cJSON_Delete(root);
 
-    // Flush sensor buffer before sending new parameters
-    self->sensor_.flush_buffer();
-    ESP_LOGI(TAG, "Sensor buffer flushed, sending parameters to VLD1 sensor...");
-
-    // Send parameters to sensor
     esp_err_t sensor_ret = self->sensor_.set_radar_parameters(params);
     self->sensor_.get_parameters();
 
-    // Prepare JSON response
     cJSON *response = cJSON_CreateObject();
     if (!response)
     {
@@ -394,8 +390,7 @@ esp_err_t web_server::handle_post_config(httpd_req_t *req)
         ESP_LOGI(TAG, "Radar parameters successfully updated on sensor");
         cJSON_AddStringToObject(response, "status", "success");
         cJSON_AddStringToObject(response, "message", "Radar parameters updated successfully");
-        
-        // Optionally verify by reading back parameters
+
         vld1::radar_params_t readback_params = self->sensor_.get_curr_radar_params();
         cJSON *params_obj = cJSON_CreateObject();
         cJSON_AddNumberToObject(params_obj, "distance_range", static_cast<int>(readback_params.distance_range));
@@ -414,27 +409,25 @@ esp_err_t web_server::handle_post_config(httpd_req_t *req)
     {
         ESP_LOGE(TAG, "Failed to update radar parameters on sensor: %s", esp_err_to_name(sensor_ret));
         cJSON_AddStringToObject(response, "status", "error");
-        
-        // Provide specific error messages based on sensor error code
+
         switch (sensor_ret)
         {
-            case ESP_ERR_TIMEOUT:
-                cJSON_AddStringToObject(response, "message", "Sensor communication timeout");
-                break;
-            case ESP_ERR_INVALID_ARG:
-                cJSON_AddStringToObject(response, "message", "Invalid parameter values");
-                break;
-            case ESP_ERR_INVALID_STATE:
-                cJSON_AddStringToObject(response, "message", "Sensor not ready");
-                break;
-            default:
-                cJSON_AddStringToObject(response, "message", "Failed to update radar parameters");
-                break;
+        case ESP_ERR_TIMEOUT:
+            cJSON_AddStringToObject(response, "message", "Sensor communication timeout");
+            break;
+        case ESP_ERR_INVALID_ARG:
+            cJSON_AddStringToObject(response, "message", "Invalid parameter values");
+            break;
+        case ESP_ERR_INVALID_STATE:
+            cJSON_AddStringToObject(response, "message", "Sensor not ready");
+            break;
+        default:
+            cJSON_AddStringToObject(response, "message", "Failed to update radar parameters");
+            break;
         }
         cJSON_AddStringToObject(response, "error_code", esp_err_to_name(sensor_ret));
     }
 
-    // Convert response to string
     char *response_str = cJSON_PrintUnformatted(response);
     if (!response_str)
     {
@@ -444,12 +437,10 @@ esp_err_t web_server::handle_post_config(httpd_req_t *req)
         return ESP_FAIL;
     }
 
-    // Send HTTP response
     httpd_resp_set_type(req, "application/json");
     httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
     esp_err_t http_ret = httpd_resp_send(req, response_str, HTTPD_RESP_USE_STRLEN);
 
-    // Cleanup
     cJSON_free(response_str);
     cJSON_Delete(response);
 

@@ -14,9 +14,9 @@ public:
     esp_err_t init();
     void deinit();
 
-    const std::string &getSSID() const { return ssid_; }
-    const std::string &getPassword() const { return password_; }
-    const std::string &getIP() const { return ip_; }
+    const std::string &get_ssid() const { return ssid_; }
+    const std::string &get_password() const { return password_; }
+    const std::string &get_ip() const { return ip_; }
 
 private:
     esp_err_t init_soft_ap();
@@ -27,11 +27,10 @@ private:
 
     static esp_err_t handle_root(httpd_req_t *req);
     static esp_err_t handle_post_config(httpd_req_t *req);
-    static void *getServerFromRequest(httpd_req_t *req);
+    static void *get_server_from_req(httpd_req_t *req);
 
     httpd_handle_t server_;
     vld1 &sensor_;
-
     std::string ssid_;
     std::string password_;
     std::string ip_;
