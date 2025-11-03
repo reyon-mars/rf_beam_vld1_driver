@@ -48,6 +48,6 @@ void application::get_pdat_and_forward(void *arg)
         }
 
         led_pdat.blink(1, 10);
-        vTaskDelay(pdMS_TO_TICKS(100));
+        vTaskDelay(pdMS_TO_TICKS(1000));
     }
 }

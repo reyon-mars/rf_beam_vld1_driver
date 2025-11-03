@@ -19,12 +19,14 @@ public:
     const std::string &getIP() const { return ip_; }
 
 private:
-    esp_err_t initSoftAP();
-    void updateIPAddress();
-    void registerHandlers();
+    esp_err_t init_soft_ap();
+    void update_ip_address();
+    void register_handlers();
 
-    static esp_err_t handleRoot(httpd_req_t *req);
-    static esp_err_t handlePostConfig(httpd_req_t *req);
+    esp_err_t serve_config_page(httpd_req_t *req, const vld1::radar_params_t &config);
+
+    static esp_err_t handle_root(httpd_req_t *req);
+    static esp_err_t handle_post_config(httpd_req_t *req);
     static void *getServerFromRequest(httpd_req_t *req);
 
     httpd_handle_t server_;

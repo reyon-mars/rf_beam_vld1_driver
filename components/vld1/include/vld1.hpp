@@ -154,6 +154,8 @@ public:
     int parse_message(uint8_t *buffer, int len, char *out_header, uint8_t *out_payload, uint32_t *out_len) noexcept;
     void flush_buffer(void) noexcept;
 
+    radar_params_t get_curr_radar_params(void) const noexcept { return vld1_config_; };
+
     esp_err_t init(const vld1_baud_t baud = vld1_baud_t::BAUD_115200) noexcept;
 
     esp_err_t get_parameters(void) noexcept;
