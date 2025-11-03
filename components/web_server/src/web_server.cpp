@@ -11,10 +11,9 @@
 
 static const char *TAG = "web_server";
 
-web_server::web_server(vld1 &sensor, SemaphoreHandle_t uart_mutex) noexcept
+web_server::web_server(vld1 &sensor) noexcept
     : server_(nullptr),
       sensor_(sensor),
-      uart_mutex_(uart_mutex),
       ssid_("VLD1_AP"),
       password_("12345678"),
       ip_("192.168.4.1"),
@@ -271,23 +270,14 @@ esp_err_t web_server::handlePostConfig(httpd_req_t *req)
     params.chirp_integration_count = static_cast<uint8_t>(get_num("chirp_integration_count"));
     params.short_range_distance_filter = static_cast<vld1::short_range_distance_t>(get_num("short_range_distance_filter"));
 
-    if (xSemaphoreTake(self->uart_mutex_, pdMS_TO_TICKS(5000)) == pdTRUE)
-    {
+    
         self->sensor_.flush_buffer();
         ESP_LOGI(TAG, "Mutex acquired, updating radar parameters...");
 
         self->sensor_.set_radar_parameters(params);
 
-        xSemaphoreGive(self->uart_mutex_);
         ESP_LOGI(TAG, "Mutex released after parameter update");
-    }
-    else
-    {
-        ESP_LOGE(TAG, "Failed to acquire UART mutex - timeout");
-        cJSON_Delete(root);
-        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "UART busy");
-        return ESP_FAIL;
-    }
+
 
     cJSON_Delete(root);
 

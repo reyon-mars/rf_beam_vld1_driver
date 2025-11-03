@@ -195,7 +195,7 @@ esp_err_t vld1::get_parameters(void) noexcept
 esp_err_t vld1::get_pdat(pdat_payload_t &pdat_data) noexcept
 {
     scoped_lock_t lock(vld1_mutex_);
-    if (!lock.locked)
+    if (!lock.locked())
     {
         return ESP_ERR_TIMEOUT;
     }

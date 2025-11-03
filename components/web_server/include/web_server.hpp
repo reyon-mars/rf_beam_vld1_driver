@@ -8,7 +8,7 @@
 class web_server
 {
 public:
-    web_server(vld1 &sensor, SemaphoreHandle_t uart_mutex) noexcept;
+    web_server(vld1 &sensor) noexcept;
     ~web_server();
 
     esp_err_t init();
@@ -29,7 +29,6 @@ private:
 
     httpd_handle_t server_;
     vld1 &sensor_;
-    SemaphoreHandle_t uart_mutex_;
 
     std::string ssid_;
     std::string password_;
