@@ -12,9 +12,11 @@ batch_averager::batch_averager(size_t batch_size,
       curr_avg_m_(0.0),
       max_step_(max_step),
       hampel_thresh_(hampel_thresh),
-      trim_fraction_(trim_fraction)
+      trim_fraction_(trim_fraction),
+      head_(0),
+      full_(false)
 {
-    samples_.reserve(batch_size_);
+    samples_.resize(batch_size_, 0.0); // Preallocate storage
 }
 
 void batch_averager::add_sample(double meters) noexcept
@@ -22,35 +24,48 @@ void batch_averager::add_sample(double meters) noexcept
     if (!std::isfinite(meters))
         return;
 
-    // Step-change limiter: reject unrealistic jumps
-    if (!samples_.empty())
+    // Step-change limiter
+    if (is_complete())
     {
-        double last = samples_.back();
+        size_t last_idx = (head_ + batch_size_ - 1) % batch_size_;
+        double last = samples_[last_idx];
         if (std::fabs(meters - last) > max_step_)
-        {
-            return; // discard physical outlier
-        }
+            return;
     }
 
-    // Maintain rolling batch
-    if (samples_.size() == batch_size_)
-        samples_.erase(samples_.begin());
-    samples_.push_back(meters);
+    // Insert sample in O(1) into circular buffer
+    samples_[head_] = meters;
+    head_ = (head_ + 1) % batch_size_;
+    if (head_ == 0)
+        full_ = true;
     ++count_;
 
     if (is_complete())
     {
-        // Apply Hampel filter to remove statistical outliers
-        auto filtered = hampel_filter(samples_, hampel_thresh_);
+        // Reconstruct chronological order for filtering
+        std::vector<double> data;
+        data.reserve(batch_size_);
+        if (full_)
+        {
+            for (size_t i = head_; i < batch_size_; ++i)
+                data.push_back(samples_[i]);
+            for (size_t i = 0; i < head_; ++i)
+                data.push_back(samples_[i]);
+        }
+        else
+        {
+            data.insert(data.end(), samples_.begin(), samples_.begin() + head_);
+        }
 
-        // Compute robust trimmed mean of remaining samples
+        // Apply Hampel filter and trimmed mean
+        auto filtered = hampel_filter(data, hampel_thresh_);
         curr_avg_m_ = compute_trimmed_mean(filtered, trim_fraction_);
     }
 }
 
 bool batch_averager::is_complete() const noexcept
 {
-    return samples_.size() >= batch_size_;
+    return full_ || head_ >= batch_size_;
 }
 
 double batch_averager::average_meters() const noexcept
@@ -72,7 +87,9 @@ void batch_averager::reset() noexcept
 {
     count_ = 0;
     curr_avg_m_ = 0.0;
-    samples_.clear();
+    std::fill(samples_.begin(), samples_.end(), 0.0);
+    head_ = 0;
+    full_ = false;
 }
 
 //----------------------------------------------
@@ -122,18 +139,15 @@ std::vector<double> batch_averager::hampel_filter(const std::vector<double> &dat
     if (mad == 0.0)
         return data; // all values identical
 
-    // Scale factor to make MAD comparable to std dev (for Gaussian)
+    // Scale factor for Gaussian equivalence
     constexpr double k = 1.4826;
     double scaled_mad = k * mad;
 
-    // Identify and reject outliers
+    // Reject outliers
     for (double x : data)
     {
-        double deviation = std::fabs(x - median);
-        if (deviation <= threshold * scaled_mad)
-        {
+        if (std::fabs(x - median) <= threshold * scaled_mad)
             filtered.push_back(x);
-        }
     }
 
     return filtered;

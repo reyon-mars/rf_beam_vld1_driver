@@ -270,14 +270,12 @@ esp_err_t web_server::handlePostConfig(httpd_req_t *req)
     params.chirp_integration_count = static_cast<uint8_t>(get_num("chirp_integration_count"));
     params.short_range_distance_filter = static_cast<vld1::short_range_distance_t>(get_num("short_range_distance_filter"));
 
-    
-        self->sensor_.flush_buffer();
-        ESP_LOGI(TAG, "Mutex acquired, updating radar parameters...");
+    self->sensor_.flush_buffer();
+    ESP_LOGI(TAG, "Mutex acquired, updating radar parameters...");
 
-        self->sensor_.set_radar_parameters(params);
+    self->sensor_.set_radar_parameters(params);
 
-        ESP_LOGI(TAG, "Mutex released after parameter update");
-
+    ESP_LOGI(TAG, "Mutex released after parameter update");
 
     cJSON_Delete(root);
 
