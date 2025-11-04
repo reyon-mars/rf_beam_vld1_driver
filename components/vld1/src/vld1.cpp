@@ -120,12 +120,12 @@ vld1::vld1_error_code_t vld1::resp_status() noexcept
     return resp_data.err_code;
 }
 
-esp_err_t vld1::get_parameters(void) noexcept
+vld1::vld1_error_code_t vld1::get_parameters(void) noexcept
 {
     scoped_lock_t lock(vld1_mutex_);
     if (!lock.locked())
     {
-        return ESP_ERR_TIMEOUT;
+        return vld1_error_code_t::MUTEX_ERR;
     }
 
     vld1_header_t header{};
@@ -134,20 +134,22 @@ esp_err_t vld1::get_parameters(void) noexcept
 
     send_packet(header, nullptr);
 
-    if (resp_status() != vld1_error_code_t::OK)
-        return ESP_FAIL;
+    vld1_error_code_t resp_err = resp_status();
+
+    if (resp_err != vld1_error_code_t::OK)
+        return resp_err;
 
     rpst_resp_t rpst_data{};
     esp_err_t err = uart_.read_exact(reinterpret_cast<uint8_t *>(&rpst_data), sizeof(rpst_resp_t));
     if (err != ESP_OK)
     {
-        return err;
+        return vld1_error_code_t::INVALID_DATA_RECEIVED;
     }
 
     if (std::strncmp(rpst_data.header.header, "RPST", 4) != 0 ||
         rpst_data.header.payload_len != sizeof(radar_params_t))
     {
-        return ESP_FAIL;
+        return vld1_error_code_t::INVALID_DATA_RECEIVED;
     }
 
     std::memcpy(&vld1_config_, &rpst_data.params, sizeof(radar_params_t));
@@ -186,15 +188,15 @@ esp_err_t vld1::get_parameters(void) noexcept
 
     ESP_LOGI("VLD1", "----------------------------------------------------------------");
 
-    return ESP_OK;
+    return vld1_error_code_t::OK;
 };
 
-esp_err_t vld1::get_pdat(pdat_payload_t &pdat_data) noexcept
+vld1::vld1_error_code_t vld1::get_pdat(pdat_payload_t &pdat_data) noexcept
 {
     scoped_lock_t lock(vld1_mutex_);
     if (!lock.locked())
     {
-        return ESP_ERR_TIMEOUT;
+        return vld1_error_code_t::MUTEX_ERR;
     }
 
     gnfd_req_t gnfd_req{};
@@ -204,18 +206,20 @@ esp_err_t vld1::get_pdat(pdat_payload_t &pdat_data) noexcept
 
     send_packet(gnfd_req.header, reinterpret_cast<const uint8_t *>(&gnfd_req.payload));
 
-    if (resp_status() != vld1_error_code_t::OK)
-        return ESP_FAIL;
+    vld1_error_code_t resp_err = resp_status();
+
+    if (resp_err != vld1_error_code_t::OK)
+        return resp_err;
 
     pdat_resp_t pdat_resp{};
     esp_err_t err = uart_.read_exact(reinterpret_cast<uint8_t *>(&pdat_resp), sizeof(pdat_resp_t));
     if (err != ESP_OK)
-        return err;
+        return vld1_error_code_t::RESP_FRAME_ERR;
 
     if (std::strncmp(pdat_resp.header.header, "PDAT", 4) != 0)
     {
         ESP_LOGE("VLD1", "Invalid PDAT header received");
-        return ESP_FAIL;
+        return vld1_error_code_t::INVALID_DATA_RECEIVED;
     }
 
     if (pdat_resp.header.payload_len != sizeof(pdat_payload_t))
@@ -224,7 +228,7 @@ esp_err_t vld1::get_pdat(pdat_payload_t &pdat_data) noexcept
                  "Invalid PDAT payload length: expected %zu, got %" PRIu32,
                  sizeof(pdat_payload_t),
                  pdat_resp.header.payload_len);
-        return ESP_FAIL;
+        return vld1_error_code_t::INVALID_DATA_RECEIVED;
     }
 
     pdat_data = pdat_resp.payload;
@@ -234,15 +238,15 @@ esp_err_t vld1::get_pdat(pdat_payload_t &pdat_data) noexcept
     ESP_LOGI("VLD1", "Magnitude : %u", pdat_data.magnitude);
     ESP_LOGI("VLD1", "-------------------------------------------");
 
-    return ESP_OK;
+    return vld1_error_code_t::OK;
 }
 
-esp_err_t vld1::init(const vld1_baud_t baud) noexcept
+vld1::vld1_error_code_t vld1::init(const vld1_baud_t baud) noexcept
 {
     scoped_lock_t lock(vld1_mutex_);
     if (!lock.locked())
     {
-        return ESP_ERR_TIMEOUT;
+        return vld1_error_code_t::MUTEX_ERR;
     }
 
     vld1_header_t header{};
@@ -253,8 +257,10 @@ esp_err_t vld1::init(const vld1_baud_t baud) noexcept
 
     send_packet(header, &payload);
 
-    if (resp_status() != vld1_error_code_t::OK)
-        return ESP_FAIL;
+    vld1_error_code_t resp_err = resp_status();
+
+    if (resp_err != vld1_error_code_t::OK)
+        return resp_err;
 
     vers_resp_t vers_resp{};
     esp_err_t err = uart_.read_exact(reinterpret_cast<uint8_t *>(&vers_resp), sizeof(vers_resp_t));
@@ -262,25 +268,25 @@ esp_err_t vld1::init(const vld1_baud_t baud) noexcept
     if (err != ESP_OK)
     {
         ESP_LOGE(TAG, "Insufficient bytes read.");
-        return ESP_FAIL;
+        return vld1_error_code_t::INVALID_DATA_RECEIVED;
     }
 
     if (std::strncmp(vers_resp.header.header, "VERS", 4) != 0 || vers_resp.header.payload_len != 19)
     {
         ESP_LOGE(TAG, "Invalid response header or payload length.");
-        return ESP_FAIL;
+        return vld1_error_code_t::INVALID_DATA_RECEIVED;
     }
 
     ESP_LOGI(TAG, "VLD1 VERSION: %s", vers_resp.version);
-    return ESP_OK;
+    return vld1_error_code_t::OK;
 }
 
-esp_err_t vld1::set_radar_parameters(const radar_params_t &params_struct) noexcept
+vld1::vld1_error_code_t vld1::set_radar_parameters(const radar_params_t &params_struct) noexcept
 {
     scoped_lock_t lock(vld1_mutex_);
     if (!lock.locked())
     {
-        return ESP_ERR_TIMEOUT;
+        return vld1_error_code_t::MUTEX_ERR;
     }
     vld1_header_t header{};
     std::memcpy(header.header, "SRPS", 4);
@@ -288,19 +294,21 @@ esp_err_t vld1::set_radar_parameters(const radar_params_t &params_struct) noexce
     header.payload_len = sizeof(radar_params_t);
     send_packet(header, reinterpret_cast<const uint8_t *>(&params_struct));
 
-    if (resp_status() != vld1_error_code_t::OK)
-        return ESP_FAIL;
+    vld1_error_code_t resp_err = resp_status();
+
+    if (resp_err != vld1_error_code_t::OK)
+        return resp_err;
 
     std::memcpy(&vld1_config_, &params_struct, sizeof(radar_params_t));
-    return ESP_OK;
+    return vld1_error_code_t::OK;
 }
 
-esp_err_t vld1::set_distance_range(vld1_distance_range_t range) noexcept
+vld1::vld1_error_code_t vld1::set_distance_range(vld1_distance_range_t range) noexcept
 {
     scoped_lock_t lock(vld1_mutex_);
     if (!lock.locked())
     {
-        return ESP_ERR_TIMEOUT;
+        return vld1_error_code_t::MUTEX_ERR;
     }
     vld1_header_t header{};
     std::memcpy(header.header, "RRAI", 4);
@@ -310,20 +318,22 @@ esp_err_t vld1::set_distance_range(vld1_distance_range_t range) noexcept
 
     send_packet(header, &payload);
 
-    if (resp_status() != vld1_error_code_t::OK)
-        return ESP_FAIL;
+    vld1_error_code_t resp_err = resp_status();
+
+    if (resp_err != vld1_error_code_t::OK)
+        return resp_err;
 
     vld1_config_.distance_range = range;
 
-    return ESP_OK;
+    return vld1_error_code_t::OK;
 }
 
-esp_err_t vld1::set_threshold_offset(uint8_t val) noexcept
+vld1::vld1_error_code_t vld1::set_threshold_offset(uint8_t val) noexcept
 {
     scoped_lock_t lock(vld1_mutex_);
     if (!lock.locked())
     {
-        return ESP_ERR_TIMEOUT;
+        return vld1_error_code_t::MUTEX_ERR;
     }
     vld1_header_t header{};
     std::memcpy(header.header, "THOF", 4);
@@ -331,20 +341,22 @@ esp_err_t vld1::set_threshold_offset(uint8_t val) noexcept
     header.payload_len = sizeof(val);
     send_packet(header, &val);
 
-    if (resp_status() != vld1_error_code_t::OK)
-        return ESP_FAIL;
+    vld1_error_code_t resp_err = resp_status();
+
+    if (resp_err != vld1_error_code_t::OK)
+        return resp_err;
 
     vld1_config_.threshold_offset = val;
 
-    return ESP_OK;
+    return vld1_error_code_t::OK;
 }
 
-esp_err_t vld1::set_min_range_filter(uint16_t val) noexcept
+vld1::vld1_error_code_t vld1::set_min_range_filter(uint16_t val) noexcept
 {
     scoped_lock_t lock(vld1_mutex_);
     if (!lock.locked())
     {
-        return ESP_ERR_TIMEOUT;
+        return vld1_error_code_t::MUTEX_ERR;
     }
     vld1_header_t header{};
     std::memcpy(header.header, "MIRA", 4);
@@ -352,20 +364,21 @@ esp_err_t vld1::set_min_range_filter(uint16_t val) noexcept
     header.payload_len = sizeof(val);
     send_packet(header, reinterpret_cast<const uint8_t *>(&val));
 
-    if (resp_status() != vld1_error_code_t::OK)
-        return ESP_FAIL;
+    vld1_error_code_t resp_err = resp_status();
+    if (resp_err != vld1_error_code_t::OK)
+        return resp_err;
 
     vld1_config_.min_range_filter = val;
 
-    return ESP_OK;
+    return vld1_error_code_t::OK;
 }
 
-esp_err_t vld1::set_max_range_filter(uint16_t val) noexcept
+vld1::vld1_error_code_t vld1::set_max_range_filter(uint16_t val) noexcept
 {
     scoped_lock_t lock(vld1_mutex_);
     if (!lock.locked())
     {
-        return ESP_ERR_TIMEOUT;
+        return vld1_error_code_t::MUTEX_ERR;
     }
     vld1_header_t header{};
     std::memcpy(header.header, "MARA", 4);
@@ -373,20 +386,22 @@ esp_err_t vld1::set_max_range_filter(uint16_t val) noexcept
     header.payload_len = sizeof(val);
     send_packet(header, reinterpret_cast<const uint8_t *>(&val));
 
-    if (resp_status() != vld1_error_code_t::OK)
-        return ESP_FAIL;
+    vld1_error_code_t resp_err = resp_status();
+
+    if (resp_err != vld1_error_code_t::OK)
+        return resp_err;
 
     vld1_config_.max_range_filter = val;
 
-    return ESP_OK;
+    return vld1_error_code_t::OK;
 }
 
-esp_err_t vld1::set_target_filter(target_filter_t filter) noexcept
+vld1::vld1_error_code_t vld1::set_target_filter(target_filter_t filter) noexcept
 {
     scoped_lock_t lock(vld1_mutex_);
     if (!lock.locked())
     {
-        return ESP_ERR_TIMEOUT;
+        return vld1_error_code_t::MUTEX_ERR;
     }
     vld1_header_t header{};
     std::memcpy(header.header, "TGFI", 4);
@@ -396,20 +411,22 @@ esp_err_t vld1::set_target_filter(target_filter_t filter) noexcept
 
     send_packet(header, &payload);
 
-    if (resp_status() != vld1_error_code_t::OK)
-        return ESP_FAIL;
+    vld1_error_code_t resp_err = resp_status();
+
+    if (resp_err != vld1_error_code_t::OK)
+        return resp_err;
 
     vld1_config_.target_filter = filter;
 
-    return ESP_OK;
+    return vld1_error_code_t::OK;
 }
 
-esp_err_t vld1::set_precision_mode(precision_mode_t mode) noexcept
+vld1::vld1_error_code_t vld1::set_precision_mode(precision_mode_t mode) noexcept
 {
     scoped_lock_t lock(vld1_mutex_);
     if (!lock.locked())
     {
-        return ESP_ERR_TIMEOUT;
+        return vld1_error_code_t::MUTEX_ERR;
     }
     vld1_header_t header{};
     std::memcpy(header.header, "PREC", 4);
@@ -419,20 +436,22 @@ esp_err_t vld1::set_precision_mode(precision_mode_t mode) noexcept
 
     send_packet(header, &payload);
 
-    if (resp_status() != vld1_error_code_t::OK)
-        return ESP_FAIL;
+    vld1_error_code_t resp_err = resp_status();
+
+    if (resp_err != vld1_error_code_t::OK)
+        return resp_err;
 
     vld1_config_.distance_precision = mode;
 
-    return ESP_OK;
+    return vld1_error_code_t::OK;
 }
 
-esp_err_t vld1::exit_sequence() noexcept
+vld1::vld1_error_code_t vld1::exit_sequence() noexcept
 {
     scoped_lock_t lock(vld1_mutex_);
     if (!lock.locked())
     {
-        return ESP_ERR_TIMEOUT;
+        return vld1_error_code_t::MUTEX_ERR;
     }
     vld1_header_t header{};
     std::memcpy(header.header, "GBYE", 4);
@@ -440,18 +459,20 @@ esp_err_t vld1::exit_sequence() noexcept
     header.payload_len = 0;
     send_packet(header, nullptr);
 
-    if (resp_status() != vld1_error_code_t::OK)
-        return ESP_FAIL;
+    vld1_error_code_t resp_err = resp_status();
 
-    return ESP_OK;
+    if (resp_err != vld1_error_code_t::OK)
+        return resp_err;
+
+    return vld1_error_code_t::OK;
 }
 
-esp_err_t vld1::set_chirp_integration_count(uint8_t val) noexcept
+vld1::vld1_error_code_t vld1::set_chirp_integration_count(uint8_t val) noexcept
 {
     scoped_lock_t lock(vld1_mutex_);
     if (!lock.locked())
     {
-        return ESP_ERR_TIMEOUT;
+        return vld1_error_code_t::MUTEX_ERR;
     }
 
     vld1_header_t header{};
@@ -460,20 +481,22 @@ esp_err_t vld1::set_chirp_integration_count(uint8_t val) noexcept
     header.payload_len = sizeof(val);
     send_packet(header, &val);
 
-    if (resp_status() != vld1_error_code_t::OK)
-        return ESP_FAIL;
+    vld1_error_code_t resp_err = resp_status();
+
+    if (resp_err != vld1_error_code_t::OK)
+        return resp_err;
 
     vld1_config_.chirp_integration_count = val;
 
-    return ESP_OK;
+    return vld1_error_code_t::OK;
 }
 
-esp_err_t vld1::set_tx_power(uint8_t val) noexcept
+vld1::vld1_error_code_t vld1::set_tx_power(uint8_t val) noexcept
 {
     scoped_lock_t lock(vld1_mutex_);
     if (!lock.locked())
     {
-        return ESP_ERR_TIMEOUT;
+        return vld1_error_code_t::MUTEX_ERR;
     }
     vld1_header_t header{};
     std::memcpy(header.header, "TXPW", 4);
@@ -481,20 +504,22 @@ esp_err_t vld1::set_tx_power(uint8_t val) noexcept
     header.payload_len = sizeof(val);
     send_packet(header, &val);
 
-    if (resp_status() != vld1_error_code_t::OK)
-        return ESP_FAIL;
+    vld1_error_code_t resp_err = resp_status();
+
+    if (resp_err != vld1_error_code_t::OK)
+        return resp_err;
 
     vld1_config_.tx_power = val;
 
-    return ESP_OK;
+    return vld1_error_code_t::OK;
 }
 
-esp_err_t vld1::set_short_range_distance_filter(short_range_distance_t state) noexcept
+vld1::vld1_error_code_t vld1::set_short_range_distance_filter(short_range_distance_t state) noexcept
 {
     scoped_lock_t lock(vld1_mutex_);
     if (!lock.locked())
     {
-        return ESP_ERR_TIMEOUT;
+        return vld1_error_code_t::MUTEX_ERR;
     }
     vld1_header_t header{};
     std::memcpy(header.header, "SRDF", 4);
@@ -504,12 +529,14 @@ esp_err_t vld1::set_short_range_distance_filter(short_range_distance_t state) no
 
     send_packet(header, &payload);
 
-    if (resp_status() != vld1_error_code_t::OK)
-        return ESP_FAIL;
+    vld1_error_code_t resp_err = resp_status();
+
+    if (resp_err != vld1_error_code_t::OK)
+        return resp_err;
 
     vld1_config_.short_range_distance_filter = state;
 
-    return ESP_OK;
+    return vld1_error_code_t::OK;
 }
 
 void vld1::vld1_flush_buffer()

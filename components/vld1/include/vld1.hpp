@@ -15,7 +15,9 @@ public:
         NO_CALIB_VALUES = 5,
         TIMEOUT = 6,
         APP_CORRUPT = 7,
-        RESP_FRAME_ERR = 8,
+        INVALID_DATA_RECEIVED = 8,
+        RESP_FRAME_ERR = 9,
+        MUTEX_ERR = 10,
     };
 
     enum class vld1_baud_t : uint8_t
@@ -152,23 +154,23 @@ public:
 
     radar_params_t get_curr_radar_params(void) const noexcept { return vld1_config_; };
 
-    esp_err_t init(const vld1_baud_t baud = vld1_baud_t::BAUD_115200) noexcept;
+    vld1_error_code_t init(const vld1_baud_t baud = vld1_baud_t::BAUD_115200) noexcept;
 
-    esp_err_t get_parameters(void) noexcept;
-    esp_err_t get_pdat(pdat_payload_t &pdat_data) noexcept;
+    vld1_error_code_t get_parameters(void) noexcept;
+    vld1_error_code_t get_pdat(pdat_payload_t &pdat_data) noexcept;
 
-    esp_err_t set_radar_parameters(const radar_params_t &params_struct) noexcept;
-    esp_err_t set_distance_range(vld1_distance_range_t range) noexcept;
-    esp_err_t set_threshold_offset(uint8_t val) noexcept;
-    esp_err_t set_min_range_filter(uint16_t val) noexcept;
-    esp_err_t set_max_range_filter(uint16_t val) noexcept;
-    esp_err_t set_target_filter(target_filter_t filter) noexcept;
-    esp_err_t set_precision_mode(precision_mode_t mode) noexcept;
-    esp_err_t set_chirp_integration_count(uint8_t val) noexcept;
-    esp_err_t set_tx_power(uint8_t val) noexcept;
-    esp_err_t set_short_range_distance_filter(short_range_distance_t state) noexcept;
+    vld1_error_code_t set_radar_parameters(const radar_params_t &params_struct) noexcept;
+    vld1_error_code_t set_distance_range(vld1_distance_range_t range) noexcept;
+    vld1_error_code_t set_threshold_offset(uint8_t val) noexcept;
+    vld1_error_code_t set_min_range_filter(uint16_t val) noexcept;
+    vld1_error_code_t set_max_range_filter(uint16_t val) noexcept;
+    vld1_error_code_t set_target_filter(target_filter_t filter) noexcept;
+    vld1_error_code_t set_precision_mode(precision_mode_t mode) noexcept;
+    vld1_error_code_t set_chirp_integration_count(uint8_t val) noexcept;
+    vld1_error_code_t set_tx_power(uint8_t val) noexcept;
+    vld1_error_code_t set_short_range_distance_filter(short_range_distance_t state) noexcept;
 
-    esp_err_t exit_sequence() noexcept;
+    vld1_error_code_t exit_sequence() noexcept;
 
 private:
     void send_packet(const vld1_header_t &header, const uint8_t *payload) noexcept;

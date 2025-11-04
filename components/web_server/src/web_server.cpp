@@ -374,7 +374,7 @@ esp_err_t web_server::handle_post_config(httpd_req_t *req)
 
     cJSON_Delete(root);
 
-    esp_err_t sensor_ret = self->sensor_.set_radar_parameters(params);
+    vld1::vld1_error_code_t sensor_ret = self->sensor_.set_radar_parameters(params);
     self->sensor_.get_parameters();
 
     cJSON *response = cJSON_CreateObject();
@@ -385,7 +385,7 @@ esp_err_t web_server::handle_post_config(httpd_req_t *req)
         return ESP_FAIL;
     }
 
-    if (sensor_ret == ESP_OK)
+    if (sensor_ret == vld1::vld1_error_code_t::OK)
     {
         ESP_LOGI(TAG, "Radar parameters successfully updated on sensor");
         cJSON_AddStringToObject(response, "status", "success");
@@ -407,25 +407,45 @@ esp_err_t web_server::handle_post_config(httpd_req_t *req)
     }
     else
     {
-        ESP_LOGE(TAG, "Failed to update radar parameters on sensor: %s", esp_err_to_name(sensor_ret));
-        cJSON_AddStringToObject(response, "status", "error");
-
-        switch (sensor_ret)
+        // Define static constexpr lookup table for clean mapping
+        struct ErrorInfo
         {
-        case ESP_ERR_TIMEOUT:
-            cJSON_AddStringToObject(response, "message", "Sensor communication timeout");
-            break;
-        case ESP_ERR_INVALID_ARG:
-            cJSON_AddStringToObject(response, "message", "Invalid parameter values");
-            break;
-        case ESP_ERR_INVALID_STATE:
-            cJSON_AddStringToObject(response, "message", "Sensor not ready");
-            break;
-        default:
-            cJSON_AddStringToObject(response, "message", "Failed to update radar parameters");
-            break;
+            vld1::vld1_error_code_t code;
+            const char *name;
+            const char *message;
+        };
+
+        static constexpr ErrorInfo error_table[] = {
+            {vld1::vld1_error_code_t::UNKNOWN_CMD, "UNKNOWN_CMD", "Unknown radar command"},
+            {vld1::vld1_error_code_t::INVALID_PARAM_VAL, "INVALID_PARAM_VAL", "Invalid parameter values"},
+            {vld1::vld1_error_code_t::INVALID_RPST_VERS, "INVALID_RPST_VERS", "Invalid report version"},
+            {vld1::vld1_error_code_t::UART_ERROR, "UART_ERROR", "UART communication failure"},
+            {vld1::vld1_error_code_t::NO_CALIB_VALUES, "NO_CALIB_VALUES", "No calibration values available"},
+            {vld1::vld1_error_code_t::TIMEOUT, "TIMEOUT", "Sensor communication timeout"},
+            {vld1::vld1_error_code_t::APP_CORRUPT, "APP_CORRUPT", "Radar firmware corrupt"},
+            {vld1::vld1_error_code_t::INVALID_DATA_RECEIVED, "INVALID_DATA_RECEIVED", "Invalid or corrupted data received"},
+            {vld1::vld1_error_code_t::RESP_FRAME_ERR, "RESP_FRAME_ERR", "Response frame format error"},
+            {vld1::vld1_error_code_t::MUTEX_ERR, "MUTEX_ERR", "Mutex acquisition/release failure"},
+        };
+
+        const char *error_name = "UNKNOWN_ERROR";
+        const char *error_msg = "Failed to update radar parameters";
+
+        for (const auto &entry : error_table)
+        {
+            if (entry.code == sensor_ret)
+            {
+                error_name = entry.name;
+                error_msg = entry.message;
+                break;
+            }
         }
-        cJSON_AddStringToObject(response, "error_code", esp_err_to_name(sensor_ret));
+
+        ESP_LOGE(TAG, "Failed to update radar parameters on sensor [%s]: %s", error_name, error_msg);
+
+        cJSON_AddStringToObject(response, "status", "error");
+        cJSON_AddStringToObject(response, "message", error_msg);
+        cJSON_AddStringToObject(response, "error_code", error_name);
     }
 
     char *response_str = cJSON_PrintUnformatted(response);
