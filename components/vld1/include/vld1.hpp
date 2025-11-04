@@ -170,7 +170,7 @@ public:
     esp_err_t set_target_filter(target_filter_t filter) noexcept;
     esp_err_t set_precision_mode(precision_mode_t mode) noexcept;
     esp_err_t set_chirp_integration_count(uint8_t val) noexcept;
-    esp_err_t set_tx_power(uint8_t power) noexcept;
+    esp_err_t set_tx_power(uint8_t val) noexcept;
     esp_err_t set_short_range_distance_filter(short_range_distance_t state) noexcept;
 
     esp_err_t exit_sequence() noexcept;
@@ -184,7 +184,7 @@ private:
     class scoped_lock
     {
     public:
-        explicit scoped_lock(SemaphoreHandle_t mutex, TickType_t timeout = pdMS_TO_TICKS(100)) noexcept
+        explicit scoped_lock(SemaphoreHandle_t mutex, TickType_t timeout = portMAX_DELAY ) noexcept
             : mutex_(mutex), locked_(false)
         {
             if (mutex_ && xSemaphoreTake(mutex_, timeout) == pdTRUE)

@@ -34,8 +34,8 @@ void application::get_pdat_and_forward(void *arg)
             rs485_regs[1] = pdat_data.magnitude;
             rs485_regs[2] = avg_distance_mm;
 
-            ESP_LOGI(TAG, "Distance=%u mm | Mag=%u | Avg=%u",
-                     distance_mm, pdat_data.magnitude, avg_distance_mm);
+            ESP_LOGI(TAG, "Distance=%u mm | Mag=%u dB | Avg=%u mm",
+                     distance_mm, (pdat_data.magnitude / 100), avg_distance_mm);
 
             rs485_slave.write(rs485_regs, 3);
         }

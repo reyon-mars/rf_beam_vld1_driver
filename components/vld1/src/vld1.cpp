@@ -313,6 +313,8 @@ esp_err_t vld1::set_distance_range(vld1_distance_range_t range) noexcept
     if (resp_status() != vld1_error_code_t::OK)
         return ESP_FAIL;
 
+    vld1_config_.distance_range = range;
+
     return ESP_OK;
 }
 
@@ -332,6 +334,8 @@ esp_err_t vld1::set_threshold_offset(uint8_t val) noexcept
     if (resp_status() != vld1_error_code_t::OK)
         return ESP_FAIL;
 
+    vld1_config_.threshold_offset = val;
+    
     return ESP_OK;
 }
 
@@ -351,6 +355,8 @@ esp_err_t vld1::set_min_range_filter(uint16_t val) noexcept
     if (resp_status() != vld1_error_code_t::OK)
         return ESP_FAIL;
 
+    vld1_config_.min_range_filter = val;
+
     return ESP_OK;
 }
 
@@ -369,6 +375,8 @@ esp_err_t vld1::set_max_range_filter(uint16_t val) noexcept
 
     if (resp_status() != vld1_error_code_t::OK)
         return ESP_FAIL;
+
+    vld1_config_.max_range_filter = val;
 
     return ESP_OK;
 }
@@ -391,6 +399,8 @@ esp_err_t vld1::set_target_filter(target_filter_t filter) noexcept
     if (resp_status() != vld1_error_code_t::OK)
         return ESP_FAIL;
 
+    vld1_config_.target_filter = filter;
+
     return ESP_OK;
 }
 
@@ -411,6 +421,8 @@ esp_err_t vld1::set_precision_mode(precision_mode_t mode) noexcept
 
     if (resp_status() != vld1_error_code_t::OK)
         return ESP_FAIL;
+
+    vld1_config_.distance_precision = mode;
 
     return ESP_OK;
 }
@@ -451,10 +463,12 @@ esp_err_t vld1::set_chirp_integration_count(uint8_t val) noexcept
     if (resp_status() != vld1_error_code_t::OK)
         return ESP_FAIL;
 
+    vld1_config_.chirp_integration_count = val;
+
     return ESP_OK;
 }
 
-esp_err_t vld1::set_tx_power(uint8_t power) noexcept
+esp_err_t vld1::set_tx_power(uint8_t val) noexcept
 {
     scoped_lock_t lock(vld1_mutex_);
     if (!lock.locked())
@@ -464,11 +478,13 @@ esp_err_t vld1::set_tx_power(uint8_t power) noexcept
     vld1_header_t header{};
     std::memcpy(header.header, "TXPW", 4);
 
-    header.payload_len = sizeof(power);
-    send_packet(header, &power);
+    header.payload_len = sizeof(val);
+    send_packet(header, &val);
 
     if (resp_status() != vld1_error_code_t::OK)
         return ESP_FAIL;
+
+    vld1_config_.tx_power = val;
 
     return ESP_OK;
 }
@@ -490,6 +506,8 @@ esp_err_t vld1::set_short_range_distance_filter(short_range_distance_t state) no
 
     if (resp_status() != vld1_error_code_t::OK)
         return ESP_FAIL;
+
+    vld1_config_.short_range_distance_filter = state;
 
     return ESP_OK;
 }

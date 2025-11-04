@@ -21,7 +21,7 @@ extern "C" void app_main()
 
     static uart rs485_uart(UART_NUM_2, 17, 16, 115200, 512);
     static rs485 rs485_slave(rs485_uart, GPIO_NUM_5);
-    rs485_slave.init(1, MB_PARAM_INPUT, 3);
+    rs485_slave.init(1, MB_PARAM_INPUT, 4);
 
     static led main_led(GPIO_NUM_2);
     main_led.init();
