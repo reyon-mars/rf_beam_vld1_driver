@@ -1,33 +1,34 @@
-#pragma once
-#include <string>
-#include "esp_err.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "freertos/semphr.h"
 #include "esp_http_server.h"
 #include "vld1.hpp"
+#include <string>
 
-class web_server {
+class web_server
+{
 public:
-    explicit web_server(vld1 &sensor) noexcept;
+    web_server(vld1 &sensor) noexcept;
     ~web_server();
 
     esp_err_t init();
     void deinit();
 
-private:
-    // Wi-Fi
-    esp_err_t initSoftAP();
-    void updateIPAddress();
-
-    // JSON config
-    esp_err_t applyConfigFromJson(const char *json_data, size_t len) noexcept;
-    std::string getConfigAsJson();
-
-    // HTTP handlers
-    static void* getServerFromRequest(httpd_req_t *req);
-    static esp_err_t handleGetConfig(httpd_req_t *req);
-    static esp_err_t handlePostConfig(httpd_req_t *req);
-    void registerHandlers();
+    const std::string &get_ssid() const { return ssid_; }
+    const std::string &get_password() const { return password_; }
+    const std::string &get_ip() const { return ip_; }
 
 private:
+    esp_err_t init_soft_ap();
+    void update_ip_address();
+    void register_handlers();
+
+    esp_err_t serve_config_page(httpd_req_t *req, const vld1::radar_params_t &config);
+
+    static esp_err_t handle_root(httpd_req_t *req);
+    static esp_err_t handle_post_config(httpd_req_t *req);
+    static void *get_server_from_req(httpd_req_t *req);
+
     httpd_handle_t server_;
     vld1 &sensor_;
     std::string ssid_;

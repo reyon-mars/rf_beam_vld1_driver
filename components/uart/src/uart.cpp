@@ -68,6 +68,52 @@ int uart::read(uint8_t *dst, size_t max_len, TickType_t ticks_to_wait) noexcept
     return uart_read_bytes(port_, dst, max_len, ticks_to_wait);
 }
 
+esp_err_t uart::read_exact(uint8_t *dst, size_t max_len, TickType_t ticks_to_wait) noexcept
+{
+    if (!dst || max_len == 0)
+    {
+        return ESP_ERR_INVALID_ARG;
+    }
+    size_t total_read = 0;
+    const TickType_t start_tick = xTaskGetTickCount();
+
+    int n = read(dst, max_len, ticks_to_wait);
+
+    if (n < 0)
+    {
+        ESP_LOGE(TAG, "UART read error on first attempt.");
+        return ESP_FAIL;
+    }
+    total_read += static_cast<size_t>(n);
+
+    while (total_read < max_len)
+    {
+        TickType_t elapsed = xTaskGetTickCount() - start_tick;
+        if (elapsed >= ticks_to_wait)
+        {
+            ESP_LOGE(TAG, "Timeout reading UART ( %zu/ %zu ) bytes.", total_read, max_len);
+            return ESP_ERR_TIMEOUT;
+        }
+
+        TickType_t remaining = ticks_to_wait - elapsed;
+        n = read(dst + total_read, max_len - total_read, remaining);
+
+        if (n < 0)
+        {
+            ESP_LOGE(TAG, "UART read error during wait.");
+            return ESP_FAIL;
+        }
+        if (n == 0)
+        {
+            vTaskDelay(pdMS_TO_TICKS(1));
+            continue;
+        }
+
+        total_read += static_cast<size_t>(n);
+    }
+    return ESP_OK;
+}
+
 int uart::write(const uint8_t *data, size_t len) noexcept
 {
     int written = uart_write_bytes(port_, reinterpret_cast<const char *>(data), len);
@@ -76,4 +122,9 @@ int uart::write(const uint8_t *data, size_t len) noexcept
         uart_wait_tx_done(port_, pdMS_TO_TICKS(100));
     }
     return written;
+}
+
+void uart::flush_buffer(void) noexcept
+{
+    uart_flush_input(port_);
 }

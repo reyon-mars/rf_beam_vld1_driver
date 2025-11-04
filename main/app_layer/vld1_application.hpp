@@ -1,4 +1,5 @@
 #pragma once
+
 #include "uart.hpp"
 #include "rs485_slave.hpp"
 #include "vld1.hpp"
@@ -8,29 +9,30 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include <cstring>
+#include <cinttypes>
 
-struct AppContext
+struct app_context
 {
-    uart *vld1_uart;
-    uart *rs485_uart;
     rs485 *rs485_slave;
     vld1 *vld1_sensor;
     batch_averager *averager;
     led *main_led;
-    vld1::radar_params_t &radar_params;
 };
 
-class Application
+class application
 {
 public:
-    Application(uart &vld1_sensor, uart &rs, rs485 &rs_slave, vld1 &v, batch_averager &avg, led &led_main, vld1::radar_params_t &radar_params)
-        : ctx_{&vld1_sensor, &rs, &rs_slave, &v, &avg, &led_main, radar_params} {}
+    application(rs485 &rs_slave,
+                vld1 &vld1_sensor,
+                batch_averager &avg,
+                led &led_main) noexcept
+        : ctx_{&rs_slave, &vld1_sensor, &avg, &led_main}
+    {
+    }
 
-    void start();
-    void start_gnfd_task();
+    void start_read_and_forward();
 
 private:
-    static void gnfd_task(void *arg);
-    static void vld1_read_task(void *arg);
-    AppContext ctx_;
+    static void get_pdat_and_forward(void *arg);
+    app_context ctx_;
 };
