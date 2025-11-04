@@ -335,7 +335,7 @@ esp_err_t vld1::set_threshold_offset(uint8_t val) noexcept
         return ESP_FAIL;
 
     vld1_config_.threshold_offset = val;
-    
+
     return ESP_OK;
 }
 
@@ -512,7 +512,7 @@ esp_err_t vld1::set_short_range_distance_filter(short_range_distance_t state) no
     return ESP_OK;
 }
 
-void vld1::flush_buffer()
+void vld1::vld1_flush_buffer()
 {
     uart_.flush_buffer();
 }

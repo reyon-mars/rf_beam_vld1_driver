@@ -150,11 +150,6 @@ public:
 
     vld1(uart &uart_no) noexcept;
 
-    void send_packet(const vld1_header_t &header, const uint8_t *payload) noexcept;
-
-    int parse_message(uint8_t *buffer, int len, char *out_header, uint8_t *out_payload, uint32_t *out_len) noexcept;
-    void flush_buffer(void) noexcept;
-
     radar_params_t get_curr_radar_params(void) const noexcept { return vld1_config_; };
 
     esp_err_t init(const vld1_baud_t baud = vld1_baud_t::BAUD_115200) noexcept;
@@ -176,7 +171,13 @@ public:
     esp_err_t exit_sequence() noexcept;
 
 private:
+    void send_packet(const vld1_header_t &header, const uint8_t *payload) noexcept;
+
     vld1_error_code_t resp_status(void) noexcept;
+
+    int parse_message(uint8_t *buffer, int len, char *out_header, uint8_t *out_payload, uint32_t *out_len) noexcept;
+
+    void vld1_flush_buffer(void) noexcept;
 
     uart &uart_;
     SemaphoreHandle_t vld1_mutex_;
@@ -184,7 +185,7 @@ private:
     class scoped_lock
     {
     public:
-        explicit scoped_lock(SemaphoreHandle_t mutex, TickType_t timeout = portMAX_DELAY ) noexcept
+        explicit scoped_lock(SemaphoreHandle_t mutex, TickType_t timeout = portMAX_DELAY) noexcept
             : mutex_(mutex), locked_(false)
         {
             if (mutex_ && xSemaphoreTake(mutex_, timeout) == pdTRUE)
