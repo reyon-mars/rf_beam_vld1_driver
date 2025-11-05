@@ -15,8 +15,8 @@ static constexpr char TAG[] = "web_server";
 web_server::web_server(vld1 &sensor) noexcept
     : server_(nullptr),
       sensor_(sensor),
-      ssid_("VLD1_AP"),
-      password_("12345678"),
+      ssid_("ESP-RLS"),
+      password_("rtsdevice123*#"),
       ip_("192.168.4.1"),
       is_initialized_(false)
 {
@@ -47,13 +47,13 @@ esp_err_t web_server::init_soft_ap()
     ESP_ERROR_CHECK(esp_wifi_init(&cfg));
 
     wifi_config_t wifi_config = {};
-    strcpy((char *)wifi_config.ap.ssid, "ESP32_AP");
-    wifi_config.ap.ssid_len = strlen("ESP32_AP");
-    strcpy((char *)wifi_config.ap.password, "12345678");
+    strcpy((char *)wifi_config.ap.ssid, ssid_.c_str());
+    wifi_config.ap.ssid_len = strlen(ssid_.c_str());
+    strcpy((char *)wifi_config.ap.password, password_.c_str());
     wifi_config.ap.authmode = WIFI_AUTH_WPA_WPA2_PSK;
     wifi_config.ap.max_connection = 4;
 
-    if (strlen("12345678") == 0)
+    if (strlen(password_.c_str()) == 0)
         wifi_config.ap.authmode = WIFI_AUTH_OPEN;
 
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_AP));
@@ -407,7 +407,6 @@ esp_err_t web_server::handle_post_config(httpd_req_t *req)
     }
     else
     {
-        // Define static constexpr lookup table for clean mapping
         struct ErrorInfo
         {
             vld1::vld1_error_code_t code;
