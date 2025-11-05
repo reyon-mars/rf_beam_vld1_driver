@@ -9,7 +9,7 @@ const char g_vld1_doc[] =
     "<!DOCTYPE html><html style=\"background-color:#F0F0F0\"><head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" charset=\"utf-8\">"
     "<title>VLD1 Radar Configuration</title>";
 
-const char g_style_start[] = "<style>";
+const char g_style_start[] = "<head><style>";
 
 const char g_style[] =
     "*{margin:0;padding:0;border:0;box-sizing:border-box;}html{height:100%;}body{position:relative;background:#f7f7f7;min-height:100%;color:#67727A;font-family:'Alegreya',sans-serif;margin:0;}input:-webkit-autofill{"
@@ -47,10 +47,10 @@ const char g_vld1_container[] =
     "<div class=\"container\"><form id=\"configForm\" method=\"post\">";
 
 const char g_vld1_firmware[] =
-    "<div class=\"row\"><div class=\"col-25\"><label>Firmware Version</label></div><div class=\"col-75\"><input type=\"text\" value=\"%s\" name=\"firmware_version\" maxlength=\"19\" readonly></div></div>";
+    "<div class=\"row\"><div class=\"col-25\"><label>Firmware Version</label></div><div class=\"col-75\"><input type=\"text\" value=\"%s\" name=\"firmware_version\" maxlength=\"32\" readonly></div></div>";
 
 const char g_vld1_unique_id[] =
-    "<div class=\"row\"><div class=\"col-25\"><label>Unique ID</label></div><div class=\"col-75\"><input type=\"text\" value=\"%s\" name=\"unique_id\" maxlength=\"12\" readonly></div></div>";
+    "<div class=\"row\"><div class=\"col-25\"><label>Unique ID</label></div><div class=\"col-75\"><input type=\"text\" value=\"%s\" name=\"unique_id\" maxlength=\"32\" readonly></div></div>";
 
 const char g_vld1_distance_range[] =
     "<div class=\"row\"><div class=\"col-25\"><label>Distance Range</label></div><div class=\"col-75\"><select name=\"distance_range\" %s>"
@@ -89,8 +89,8 @@ const char g_vld1_short_range[] =
 const char g_vld1_script[] =
     "<script>function submitForm(){const form=document.getElementById('configForm');const data={};"
     "for(let i=0;i<form.elements.length;i++){const e=form.elements[i];if(e.name)data[e.name]=isNaN(e.value)?e.value:Number(e.value);}"
-    "fetch('/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)})"
-    ".then(r=>r.json()).then(resp=>{if(resp.status==='success'){alert('Configuration updated successfully!');}else{alert('Update failed: '+resp.message);}}).catch(err=>alert('Error: '+err));}</script>";
+    "fetch('/vld1_config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)})"
+    ".then(r=>alert(r.ok?'Configuration updated!':'Update failed!'));}</script>";
 
 const char g_vld1_form_end[] =
     "<div class=\"row\"><input type=\"button\" value=\"Submit\" onclick=\"submitForm()\"></div></form></div>";

@@ -15,14 +15,16 @@ void application::get_pdat_and_forward(void *arg)
     vld1 &sensor = *app->ctx_.vld1_sensor;
     rs485 &rs485_slave = *app->ctx_.rs485_slave;
     batch_averager &avg = *app->ctx_.averager;
-    led &led_pdat = *app->ctx_.main_led;
+    led &led_main = *app->ctx_.main_led;
 
     vld1::pdat_payload_t pdat_data{};
-    uint16_t rs485_regs[3] = {0xFFFF, 0xFFFF, 0xFFFF};
+    uint16_t rs485_regs[4] = {0xFFFF, 0xFFFF, 0xFFFF, 0x0000};
 
     while (true)
     {
-        if (sensor.get_pdat(pdat_data) == ESP_OK)
+        vld1::vld1_error_code_t err = sensor.get_pdat(pdat_data);
+
+        if (err == vld1::vld1_error_code_t::OK)
         {
             float distance_m = pdat_data.distance;
             uint16_t distance_mm = static_cast<uint16_t>(distance_m * 1000.0f);
@@ -33,21 +35,23 @@ void application::get_pdat_and_forward(void *arg)
             rs485_regs[0] = distance_mm;
             rs485_regs[1] = pdat_data.magnitude;
             rs485_regs[2] = avg_distance_mm;
+            rs485_regs[3] = static_cast<uint16_t>(err);
 
             ESP_LOGI(TAG, "Distance=%u mm | Mag=%u dB | Avg=%u mm",
                      distance_mm, (pdat_data.magnitude / 100), avg_distance_mm);
 
-            rs485_slave.write(rs485_regs, 3);
+            rs485_slave.write(rs485_regs, 4);
         }
         else
         {
             rs485_regs[0] = 0xFFFF;
             rs485_regs[1] = 0xFFFF;
             rs485_regs[2] = 0xFFFF;
-            rs485_slave.write(rs485_regs, 3);
+            rs485_regs[3] = static_cast<uint16_t>(err);
+            rs485_slave.write(rs485_regs, 4);
         }
 
-        led_pdat.blink(1, 10);
+        led_main.blink(2, 20);
         vTaskDelay(pdMS_TO_TICKS(1000));
     }
 }
