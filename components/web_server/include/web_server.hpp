@@ -2,7 +2,16 @@
 #include "freertos/task.h"
 #include "freertos/semphr.h"
 #include "esp_http_server.h"
+#include "cJSON.h"
+#include "esp_wifi.h"
+#include "esp_netif.h"
+#include "esp_event.h"
+#include "esp_log.h"
+#include "esp_http_server.h"
+#include "page_layout.hpp"
 #include "vld1.hpp"
+#include <cstring>
+#include <memory>
 #include <string>
 
 class web_server

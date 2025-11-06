@@ -8,13 +8,23 @@
 #include "freertos/task.h"
 #include "web_server.hpp"
 #include "esp_log.h"
+#include "nvs_flash.h"
 #include <cstring>
 
 static constexpr char TAG[] = "Main";
 
 extern "C" void app_main()
 {
-    ESP_LOGI(TAG, "Starting VLD1 app");
+    ESP_LOGI(TAG, "Starting VLD1.");
+
+    esp_err_t ret = nvs_flash_init();
+    if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND)
+    {
+        ESP_LOGW(TAG, "NVS partition was truncated or version mismatch; erasing...");
+        ESP_ERROR_CHECK(nvs_flash_erase());
+        ret = nvs_flash_init();
+    }
+    ESP_ERROR_CHECK(ret);
 
     static uart vld1_uart(UART_NUM_1, 12, 13, 115200, 512);
     vld1_uart.init(UART_DATA_8_BITS, UART_PARITY_EVEN, UART_STOP_BITS_1);
@@ -33,16 +43,7 @@ extern "C" void app_main()
     static application app(rs485_slave, vld1_sensor, averager, main_led);
 
     vld1_sensor.init();
-    vld1_sensor.set_distance_range(vld1::vld1_distance_range_t::range_50);
-    vld1_sensor.set_threshold_offset(40);
-    vld1_sensor.set_min_range_filter(1);
-    vld1_sensor.set_max_range_filter(505);
-    vld1_sensor.set_target_filter(vld1::target_filter_t::strongest);
-    vld1_sensor.set_precision_mode(vld1::precision_mode_t::high);
-    vld1_sensor.set_chirp_integration_count(1);
-    vld1_sensor.set_tx_power(31);
-    vld1_sensor.set_short_range_distance_filter(vld1::short_range_distance_t::disable);
-
+    vld1_sensor.restore_config();
     vld1_sensor.get_parameters();
 
     static web_server server(vld1_sensor);
