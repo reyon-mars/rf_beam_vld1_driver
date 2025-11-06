@@ -1,7 +1,4 @@
 #include "uart.hpp"
-#include "esp_log.h"
-#include "esp_err.h"
-#include <cstring>
 
 static constexpr char TAG[] = "Uart";
 

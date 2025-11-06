@@ -1,6 +1,4 @@
 #include "rs485_slave.hpp"
-#include "esp_log.h"
-#include <string>
 
 static constexpr char TAG[] = "RS485";
 

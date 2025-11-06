@@ -1,6 +1,10 @@
 #pragma once
 #include <cstdint>
 #include <cstddef>
+#include <cstring>
+#include <inttypes.h>
+#include "esp_log.h"
+#include "nvs_flash.h"
 #include "uart.hpp"
 class vld1
 {
@@ -18,6 +22,7 @@ public:
         INVALID_DATA_RECEIVED = 8,
         RESP_FRAME_ERR = 9,
         MUTEX_ERR = 10,
+        SAVE_FAIL = 11,
     };
 
     enum class vld1_baud_t : uint8_t
@@ -158,6 +163,9 @@ public:
 
     vld1_error_code_t get_parameters(void) noexcept;
     vld1_error_code_t get_pdat(pdat_payload_t &pdat_data) noexcept;
+
+    esp_err_t save_config(const radar_params_t &params_struct) noexcept;
+    esp_err_t restore_config(void) noexcept;
 
     vld1_error_code_t set_radar_parameters(const radar_params_t &params_struct) noexcept;
     vld1_error_code_t set_distance_range(vld1_distance_range_t range) noexcept;

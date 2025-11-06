@@ -1,22 +1,12 @@
-#include "nvs_flash.h"
-#include "esp_wifi.h"
-#include "esp_netif.h"
-#include "esp_event.h"
-#include "esp_log.h"
-#include "esp_http_server.h"
 #include "web_server.hpp"
-#include "page_layout.hpp"
-#include "cJSON.h"
-#include <cstring>
-#include <memory>
 
 static constexpr char TAG[] = "web_server";
 
 web_server::web_server(vld1 &sensor) noexcept
     : server_(nullptr),
       sensor_(sensor),
-      ssid_("VLD1_AP"),
-      password_("12345678"),
+      ssid_("ESP-RLS"),
+      password_("rtsdevice123*#"),
       ip_("192.168.4.1"),
       is_initialized_(false)
 {
@@ -29,14 +19,6 @@ web_server::~web_server()
 
 esp_err_t web_server::init_soft_ap()
 {
-    esp_err_t ret = nvs_flash_init();
-    if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND)
-    {
-        ESP_LOGW(TAG, "NVS partition was truncated or version mismatch; erasing...");
-        ESP_ERROR_CHECK(nvs_flash_erase());
-        ret = nvs_flash_init();
-    }
-    ESP_ERROR_CHECK(ret);
 
     ESP_ERROR_CHECK(esp_netif_init());
     ESP_ERROR_CHECK(esp_event_loop_create_default());
@@ -47,13 +29,13 @@ esp_err_t web_server::init_soft_ap()
     ESP_ERROR_CHECK(esp_wifi_init(&cfg));
 
     wifi_config_t wifi_config = {};
-    strcpy((char *)wifi_config.ap.ssid, "ESP32_AP");
-    wifi_config.ap.ssid_len = strlen("ESP32_AP");
-    strcpy((char *)wifi_config.ap.password, "12345678");
+    strcpy((char *)wifi_config.ap.ssid, ssid_.c_str());
+    wifi_config.ap.ssid_len = strlen(ssid_.c_str());
+    strcpy((char *)wifi_config.ap.password, password_.c_str());
     wifi_config.ap.authmode = WIFI_AUTH_WPA_WPA2_PSK;
     wifi_config.ap.max_connection = 4;
 
-    if (strlen("12345678") == 0)
+    if (strlen(password_.c_str()) == 0)
         wifi_config.ap.authmode = WIFI_AUTH_OPEN;
 
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_AP));
@@ -407,7 +389,6 @@ esp_err_t web_server::handle_post_config(httpd_req_t *req)
     }
     else
     {
-        // Define static constexpr lookup table for clean mapping
         struct ErrorInfo
         {
             vld1::vld1_error_code_t code;

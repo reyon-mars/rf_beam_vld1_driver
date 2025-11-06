@@ -1,7 +1,4 @@
 #include "averager.hpp"
-#include <algorithm>
-#include <numeric>
-#include <cmath>
 
 batch_averager::batch_averager(size_t batch_size,
                                double max_step,

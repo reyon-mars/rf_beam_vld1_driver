@@ -1,5 +1,5 @@
 idf_component_register(
     SRCS "src/web_server.cpp"
     INCLUDE_DIRS "include"
-    REQUIRES esp_http_server esp_wifi nvs_flash vld1 json
+    REQUIRES esp_http_server esp_wifi vld1 json
 )

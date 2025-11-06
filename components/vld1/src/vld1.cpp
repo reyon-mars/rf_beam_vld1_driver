@@ -1,9 +1,7 @@
 #include "vld1.hpp"
-#include "esp_log.h"
-#include <cstring>
-#include <inttypes.h>
 
 static constexpr char TAG[] = "VLD1";
+static constexpr char vld1_nvs_lable[] = "vld1_nvs";
 
 vld1::vld1(uart &uart_no) noexcept
     : uart_(uart_no)
@@ -57,6 +55,59 @@ int vld1::parse_message(uint8_t *buffer, int len, char *response_code,
         std::memcpy(out_payload, buffer + sizeof(vld1_header_t), payload_len);
 
     return static_cast<int>(total_len);
+}
+
+esp_err_t vld1::save_config(const radar_params_t &params_struct) noexcept
+{
+    nvs_handle_t handle;
+    esp_err_t err = nvs_open(vld1_nvs_lable, NVS_READWRITE, &handle);
+
+    if (err != ESP_OK)
+    {
+        ESP_LOGE(TAG, "Failed to open NVS: %s", esp_err_to_name(err));
+        return err;
+    }
+    err = nvs_set_blob(handle, "radar_params", &params_struct, sizeof(params_struct));
+    if (err == ESP_OK)
+    {
+        err = nvs_commit(handle);
+        ESP_LOGI(TAG, "Radar parameters saved to NVS");
+    }
+    else
+    {
+        ESP_LOGE(TAG, "Failed to write radar_params to NVS: %s", esp_err_to_name(err));
+    }
+
+    nvs_close(handle);
+    return err;
+}
+
+esp_err_t vld1::restore_config(void) noexcept
+{
+    nvs_handle_t handle;
+    esp_err_t err = nvs_open(vld1_nvs_lable, NVS_READONLY, &handle);
+    if (err != ESP_OK)
+    {
+        ESP_LOGE(TAG, "Failed to open NVS: %s", esp_err_to_name(err));
+        return err;
+    }
+
+    radar_params_t params{};
+    size_t required_size = sizeof(params);
+
+    err = nvs_get_blob(handle, "radar_params", &params, &required_size);
+    if (err == ESP_OK)
+    {
+        ESP_LOGI(TAG, "Loaded radar parameters from NVS");
+        set_radar_parameters(params);
+    }
+    else
+    {
+        ESP_LOGW(TAG, "Failed to load radar parameters: %s", esp_err_to_name(err));
+    }
+
+    nvs_close(handle);
+    return err;
 }
 
 vld1::vld1_error_code_t vld1::resp_status() noexcept
@@ -300,6 +351,11 @@ vld1::vld1_error_code_t vld1::set_radar_parameters(const radar_params_t &params_
         return resp_err;
 
     std::memcpy(&vld1_config_, &params_struct, sizeof(radar_params_t));
+    if (save_config(params_struct) != ESP_OK)
+    {
+        return vld1_error_code_t::SAVE_FAIL;
+    }
+
     return vld1_error_code_t::OK;
 }
 
