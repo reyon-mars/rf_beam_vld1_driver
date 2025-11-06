@@ -4,6 +4,9 @@
 #include <cstddef>
 #include <cstdint>
 #include <cmath>
+#include <algorithm>
+#include <numeric>
+#include <cmath>
 
 class batch_averager
 {

@@ -1,6 +1,10 @@
 #pragma once
 #include "freertos/FreeRTOS.h"
 #include "driver/uart.h"
+#include "esp_log.h"
+#include "esp_err.h"
+#include <cstring>
+
 #include <cstddef>
 #include <cstdint>
 
@@ -15,7 +19,7 @@ public:
                    uart_stop_bits_t stop_bits = UART_STOP_BITS_1) noexcept;
 
     int read(uint8_t *dst, size_t max_len, TickType_t ticks_to_wait) noexcept;
-    esp_err_t read_exact(uint8_t *dst, size_t max_len, TickType_t ticks_to_wait = 10 ) noexcept;
+    esp_err_t read_exact(uint8_t *dst, size_t max_len, TickType_t ticks_to_wait = 10) noexcept;
 
     int write(const uint8_t *data, size_t len) noexcept;
 
