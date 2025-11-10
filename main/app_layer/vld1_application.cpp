@@ -52,6 +52,6 @@ void application::get_pdat_and_forward(void *arg)
         }
 
         led_main.blink(2, 20);
-        vTaskDelay(pdMS_TO_TICKS(5));
+        vTaskDelay(pdMS_TO_TICKS(1));
     }
 }

@@ -29,7 +29,7 @@ extern "C" void app_main()
     static uart vld1_uart(UART_NUM_1, 12, 13, 115200, 512);
     vld1_uart.init(UART_DATA_8_BITS, UART_PARITY_EVEN, UART_STOP_BITS_1);
 
-    static uart rs485_uart(UART_NUM_2, 17, 16, 115200, 512);
+    static uart rs485_uart(UART_NUM_2, 17, 16, 9600, 512);
     static rs485 rs485_slave(rs485_uart, GPIO_NUM_5);
     rs485_slave.init(1, MB_PARAM_INPUT, 4);
 
